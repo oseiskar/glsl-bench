@@ -146,7 +146,10 @@ class Framebuffer:
     @contextmanager
     def _bind(self):
         glBindFramebuffer(GL_FRAMEBUFFER, self._gl_handle)
+        glPushAttrib(GL_VIEWPORT_BIT)
+        glViewport(0, 0, self.w, self.h)
         yield
+        glPopAttrib()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     @contextmanager

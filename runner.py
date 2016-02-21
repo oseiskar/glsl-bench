@@ -17,6 +17,7 @@ def parse_command_line_arguments():
     arg_parser.add_argument('-itr', '--itr_per_refresh', type=int, default=1)
     arg_parser.add_argument('-np', '--numpy_output_file')
     arg_parser.add_argument('-png', '--png_output_file', default='out.png')
+    arg_parser.add_argument('-res', '--preview_resolution')
 
     arg_parser.add_argument('shader_file')
     return arg_parser.parse_args()
@@ -27,6 +28,8 @@ def main(args):
     shader = Shader.new_from_file(args.shader_file)
 
     window_resolution = shader.resolution
+    if args.preview_resolution is not None:
+        window_resolution = [int(x) for x in args.preview_resolution.split('x')]
 
     pygame.init()
     pygame.display.set_mode(window_resolution, pygame.locals.DOUBLEBUF | pygame.locals.OPENGL)
