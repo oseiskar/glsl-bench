@@ -2,7 +2,7 @@
 import pygame
 import pygame.locals
 import numpy
-import time
+import time, sys, os, argparse
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -10,6 +10,19 @@ from OpenGL.GLU import *
 import scipy.misc
 
 from gl_boilerplate import compile_program, create_texture, PASSTHROUGH_VERTEX_SHADER
+
+def parse_command_line_arguments():
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('-itr', '--itr_per_refresh', type=int, default=1)
+    arg_parser.add_argument('-np', '--numpy_output_file')
+    arg_parser.add_argument('-png', '--png_output_file', default='out.png')
+
+    arg_parser.add_argument('shader_file')
+    return arg_parser.parse_args()
+
+def read_file(filename):
+    with open(filename) as f:
+        return f.read()
 
 def texture_rect(aspect, brightness=None):
     glBegin(GL_QUADS)
@@ -25,7 +38,7 @@ def texture_rect(aspect, brightness=None):
     glVertex3f(-aspect, 1, 0)
     glEnd()
 
-def main():
+def main(args):
     t0 = time.time()
 
     pygame.init()
@@ -53,29 +66,7 @@ def main():
     glMatrixMode(GL_MODELVIEW);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 
-    shader = compile_program(PASSTHROUGH_VERTEX_SHADER, '''
-
-        // Fragment shader
-
-        uniform vec2 resolution;
-        uniform float t;
-        uniform sampler2D base_image;
-
-        varying vec3 pos;
-
-        void main() {
-
-            vec2 center = vec2(cos(t)*0.4, sin(t)*0.3);
-            vec3 base_color = texture2D(base_image, gl_FragCoord.xy / resolution.xy).xyz;
-
-            vec3 cur_color = vec3(0.0,0.0,0.0);
-
-            if (length(center-pos.xy) < 0.2)
-                cur_color = vec3(1.0, 1.0, 0.5);
-
-            gl_FragColor = vec4(base_color + cur_color, 1.0);
-        }
-        ''')
+    shader = compile_program(PASSTHROUGH_VERTEX_SHADER, read_file(args.shader_file))
 
     uniform_names = ('t', 'base_image', 'resolution')
     uniforms = { name: glGetUniformLocation(shader, name) for name in uniform_names }
@@ -84,19 +75,29 @@ def main():
 
     n_samples = 0
 
+    def save_results():
+
+        # read image data from the framebuffer
+        result_image = read_framebuffer()
+
+        if args.numpy_output_file is not None:
+            # save raw 32-bit float / HDR channels as a numpy array
+            numpy.save(args.numpy_output_file, result_image)
+
+        if args.png_output_file is not None:
+            # normalize and save as 8-bit channels (PNG)
+            result_image = numpy.clip(result_image / n_samples, 0.0, 1.0)*255
+            result_image = result_image.astype(numpy.uint8)
+
+            scipy.misc.imsave(args.png_output_file, result_image)
+
     while True:
         n_samples += 1
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
 
-                # read image data from the framebuffer
-                result_image = read_framebuffer()
-                # normalize
-                result_image = numpy.clip(result_image / n_samples, 0.0, 1.0)*255
-                result_image = result_image.astype(numpy.uint8)
-
-                scipy.misc.imsave('result.png', result_image)
+                save_results()
 
                 pygame.quit()
                 quit()
@@ -139,4 +140,6 @@ def main():
         textures = textures[::-1]
 
 
-main()
+if __name__ == '__main__':
+    args = parse_command_line_arguments()
+    main(args)
