@@ -49,33 +49,19 @@ def compile_program(vertex_source, fragment_source):
 
     return program
 
-def create_texture(w=None, h=None, content=None, format=GL_RGB,
-        type=GL_FLOAT, interpolation=GL_LINEAR, texture_wrap=GL_REPEAT,
-        internal_format=None):
-
-    # note: internal format needs to be GL_RGB32F to have float textures
-    if internal_format is None:
-        internal_format = format
-
-    if content is not None:
-        if isinstance(content, float):
-            content = numpy.zeros((h,w,3))
-        assert(w is None or w == content.shape[1])
-        assert(h is None or h == content.shape[0])
-        w = content.shape[1]
-        h = content.shape[0]
-
-    texture = glGenTextures(1)
-    glBindTexture( GL_TEXTURE_2D, texture )
-    glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_wrap);
-    glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_wrap);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, interpolation)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, interpolation)
-
-    glTexImage2D(GL_TEXTURE_2D,0,internal_format,w,h,0,format,type,content)
-
-    glBindTexture( GL_TEXTURE_2D, 0 )
-    return texture
+def texture_rect(aspect, brightness=None):
+    glBegin(GL_QUADS)
+    if brightness is not None:
+        glColor3f(brightness, brightness, brightness)
+    glTexCoord2f(0,0)
+    glVertex3f(-aspect,-1, 0)
+    glTexCoord2f(1,0)
+    glVertex3f( aspect,-1, 0)
+    glTexCoord2f(1,1)
+    glVertex3f( aspect, 1, 0)
+    glTexCoord2f(0,1)
+    glVertex3f(-aspect, 1, 0)
+    glEnd()
 
 PASSTHROUGH_VERTEX_SHADER = '''
     varying vec3 pos;
@@ -84,3 +70,6 @@ PASSTHROUGH_VERTEX_SHADER = '''
         gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
     }
 '''
+
+def compile_fragment_shader_only(source):
+    return compile_program(PASSTHROUGH_VERTEX_SHADER, source)

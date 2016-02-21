@@ -1,0 +1,7 @@
+{
+    "resolution": [800, 600],
+    "source_path": "example.glsl",
+    "uniforms": {
+        "t": 0.0
+    }
+}
