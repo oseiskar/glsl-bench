@@ -7,6 +7,8 @@ import time
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
+import scipy.misc
+
 from gl_boilerplate import compile_program, create_texture, PASSTHROUGH_VERTEX_SHADER
 
 def texture_rect(aspect, brightness=None):
@@ -36,6 +38,13 @@ def main():
 
     framebuffer = glGenFramebuffers(1)
     textures = [new_texture() for _ in range(2)]
+
+    def read_framebuffer():
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer)
+        texture_data = glReadPixels(0,0, display[0], display[1], GL_RGB, GL_FLOAT)
+        texture_data = numpy.reshape(texture_data, (display[1], display[0], 3))
+        texture_data = texture_data[::-1,:,:]
+        return texture_data
 
     aspect = display[0]/float(display[1])
     glMatrixMode(GL_PROJECTION);
@@ -80,6 +89,15 @@ def main():
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+
+                # read image data from the framebuffer
+                result_image = read_framebuffer()
+                # normalize
+                result_image = numpy.clip(result_image / n_samples, 0.0, 1.0)*255
+                result_image = result_image.astype(numpy.uint8)
+
+                scipy.misc.imsave('result.png', result_image)
+
                 pygame.quit()
                 quit()
 
@@ -110,7 +128,7 @@ def main():
 
         # render from texture 0
         glBindTexture(GL_TEXTURE_2D, textures[1])
-        texture_rect(aspect, 1.0 / (n_samples+1))
+        texture_rect(aspect, 1.0 / n_samples)
 
         glBindTexture(GL_TEXTURE_2D, 0)
 
