@@ -33,6 +33,7 @@ def main(args):
 
     pygame.init()
     pygame.display.set_mode(window_resolution, pygame.locals.DOUBLEBUF | pygame.locals.OPENGL)
+    pygame.display.set_caption(args.shader_file)
 
     shader.build()
 
@@ -82,9 +83,8 @@ def main(args):
         with shader.use_program():
             with framebuffer.render_to_texture(textures[1]):
 
-                t = n_samples * 0.01
-                shader.set_textures(base_image=textures[0])
-                shader.set_uniforms(t=t)
+                t = time.time() - t0
+                shader.set_uniforms(t=t, base_image=textures[0])
 
                 # render
                 texture_rect(aspect)
@@ -98,7 +98,6 @@ def main(args):
 
         # flip buffers
         textures = textures[::-1]
-
 
 if __name__ == '__main__':
     args = parse_command_line_arguments()

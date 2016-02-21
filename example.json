@@ -2,6 +2,7 @@
     "resolution": [1024, 768],
     "source_path": "example.glsl",
     "uniforms": {
-        "t": 0.0
+        "t": 0.0,
+        "radius": 0.3
     }
 }

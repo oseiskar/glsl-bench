@@ -2,6 +2,7 @@
 // Fragment shader
 
 uniform vec2 resolution;
+uniform float radius;
 uniform float t;
 uniform sampler2D base_image;
 
@@ -14,7 +15,7 @@ void main() {
 
     vec3 cur_color = vec3(0.0,0.0,0.0);
 
-    if (length(center-pos.xy) < 0.2)
+    if (length(center-pos.xy) < radius)
         cur_color = vec3(1.0, 1.0, 0.5);
 
     gl_FragColor = vec4(base_color + cur_color, 1.0);

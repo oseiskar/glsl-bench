@@ -58,7 +58,7 @@ class Shader:
         self._find_uniforms()
 
     def _add_built_in_uniforms(self):
-        self.uniforms['resolution'] = self.resolution
+        self.uniforms['resolution'] = [float(x) for x in self.resolution]
         self.uniforms['base_image'] = None
 
     def _build_program(self):
@@ -80,6 +80,12 @@ class Shader:
         handle = self._uniform_handles.get(name)
         auto_gl_call('glUniform', value, before_args=[handle])
 
+    def _set_texture(self, name, value):
+        gl_texture_unit = self._assign_texture(name)
+        glActiveTexture(GL_TEXTURE0 + gl_texture_unit)
+        glBindTexture(GL_TEXTURE_2D, value._gl_handle)
+        glUniform1i(self._uniform_handles.get(name), gl_texture_unit)
+
     def _assign_texture(self, name):
         if name not in self._texture_units:
             new_unit = len(self._texture_units)
@@ -87,19 +93,15 @@ class Shader:
             #print 'associated', name, 'with GL texture unit', new_unit
         return self._texture_units[name]
 
-    def set_textures(self, **kwargs):
-        for name, value in kwargs.items():
-            gl_texture_unit = self._assign_texture(name)
-            glActiveTexture(GL_TEXTURE0 + gl_texture_unit)
-            if isinstance(value, Texture): value = value._gl_handle
-            glBindTexture(GL_TEXTURE_2D, value)
-            glUniform1i(self._uniform_handles.get(name), gl_texture_unit)
-
     def set_uniforms(self, **kwargs):
         for name, value in kwargs.items():
-            self._set_uniform(name, value)
+            self.uniforms[name] = value
 
-        self._set_uniform('resolution', [float(x) for x in self.resolution])
+        for name, value in self.uniforms.items():
+            if isinstance(value, Texture):
+                self._set_texture(name, value)
+            else:
+                self._set_uniform(name, value)
 
 class Texture:
     def __init__(self, w=None, h=None, content=None, format=GL_RGB,
