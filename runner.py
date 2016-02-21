@@ -14,7 +14,7 @@ from gl_boilerplate import texture_rect
 
 def parse_command_line_arguments():
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-itr', '--itr_per_refresh', type=int, default=1)
+    arg_parser.add_argument('-refresh', '--refresh_every', type=int, default=1)
     arg_parser.add_argument('-np', '--numpy_output_file')
     arg_parser.add_argument('-png', '--png_output_file', default='out.png')
     arg_parser.add_argument('-res', '--preview_resolution')
@@ -89,12 +89,12 @@ def main(args):
                 # render
                 texture_rect(aspect)
 
-        # render from texture 0
-        with textures[1].bind():
-            texture_rect(aspect, 1.0 / n_samples)
+        if n_samples % args.refresh_every == 0:
+            # render from texture 0
+            with textures[1].bind():
+                texture_rect(aspect, 1.0 / n_samples)
 
-        pygame.display.flip()
-        pygame.time.wait(10)
+            pygame.display.flip()
 
         # flip buffers
         textures = textures[::-1]
