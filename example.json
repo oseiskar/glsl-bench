@@ -1,5 +1,5 @@
 {
-    "resolution": [800, 600],
+    "resolution": [1024, 768],
     "source_path": "example.glsl",
     "uniforms": {
         "t": 0.0

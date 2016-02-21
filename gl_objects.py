@@ -44,12 +44,18 @@ class Shader:
         self.resolution = json_data['resolution']
         self.uniforms = json_data['uniforms']
 
-        self._source = read_file(json_data['source_path'])
-        self._build_program()
         self._add_built_in_uniforms()
-        self._find_uniforms()
+        self._source = read_file(json_data['source_path'])
 
         self._texture_units = {}
+
+    @property
+    def aspect_ratio(self):
+        return self.resolution[0] / float(self.resolution[1])
+
+    def build(self):
+        self._build_program()
+        self._find_uniforms()
 
     def _add_built_in_uniforms(self):
         self.uniforms['resolution'] = self.resolution

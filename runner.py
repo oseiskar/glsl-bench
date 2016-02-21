@@ -24,28 +24,29 @@ def parse_command_line_arguments():
 def main(args):
     t0 = time.time()
 
+    shader = Shader.new_from_file(args.shader_file)
+
+    window_resolution = shader.resolution
+
     pygame.init()
-    display = (800,600)
-    pygame.display.set_mode(display, pygame.locals.DOUBLEBUF | pygame.locals.OPENGL)
+    pygame.display.set_mode(window_resolution, pygame.locals.DOUBLEBUF | pygame.locals.OPENGL)
+
+    shader.build()
 
     def new_texture():
-        return Texture(display[0], display[1], \
+        return Texture(*shader.resolution, \
             interpolation=GL_NEAREST, internal_format=GL_RGB32F, content=0.0)
 
     textures = [new_texture() for _ in range(2)]
-    framebuffer = Framebuffer(display[0], display[1])
+    framebuffer = Framebuffer(*shader.resolution)
 
-    aspect = display[0]/float(display[1])
+    aspect = shader.aspect_ratio
+
     glMatrixMode(GL_PROJECTION);
     glOrtho(-aspect, aspect, -1, 1, 1, -1)
 
     glMatrixMode(GL_MODELVIEW);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-
-    shader = Shader.new_from_file(args.shader_file)
-
-    glEnable( GL_TEXTURE_2D )
-    n_samples = 0
 
     def save_results():
 
@@ -62,6 +63,9 @@ def main(args):
             result_image = result_image.astype(numpy.uint8)
 
             scipy.misc.imsave(args.png_output_file, result_image)
+
+    glEnable( GL_TEXTURE_2D )
+    n_samples = 0
 
     while True:
         n_samples += 1
