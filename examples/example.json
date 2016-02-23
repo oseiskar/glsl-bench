@@ -1,11 +1,11 @@
 {
     "resolution": [1024, 768],
-    "source_path": "example.glsl",
+    "source_path": "examples/example.glsl",
     "uniforms": {
         "t": "time",
         "resolution": "resolution",
         "base_image": "previous_frame",
         "radius": 0.3,
-        "mouse": "mouse"
+        "mouse": "relative_mouse"
     }
 }

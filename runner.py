@@ -75,6 +75,10 @@ def main(args):
         x,y = pygame.mouse.get_pos()
         return [x / float(window_resolution[0]), y / float(window_resolution[1])]
 
+    def get_absolute_mouse():
+        x, y = get_rel_mouse()
+        return [x*shader.resolution[0], y*shader.resolution[1]]
+
     while True:
         n_samples += 1
 
@@ -93,9 +97,11 @@ def main(args):
                     elif source == 'previous_frame':
                         shader.uniforms[name] = textures[0]
                     elif source == 'resolution':
-                        shader.uniforms[name] = map(float, shader.resolution);
+                        shader.uniforms[name] = map(float, shader.resolution)
                     elif source == 'mouse':
-                        shader.uniforms[name] = get_rel_mouse();
+                        shader.uniforms[name] = get_absolute_mouse()
+                    elif source == 'relative_mouse':
+                        shader.uniforms[name] = get_rel_mouse()
                     else:
                         raise RuntimeError('invalid uniform mapping %s <- %s' % (name, source))
 
