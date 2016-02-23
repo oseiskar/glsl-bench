@@ -71,6 +71,10 @@ def main(args):
     glEnable( GL_TEXTURE_2D )
     n_samples = 0
 
+    def get_rel_mouse():
+        x,y = pygame.mouse.get_pos()
+        return [x / float(window_resolution[0]), y / float(window_resolution[1])]
+
     while True:
         n_samples += 1
 
@@ -83,8 +87,19 @@ def main(args):
         with shader.use_program():
             with framebuffer.render_to_texture(textures[1]):
 
-                t = time.time() - t0
-                shader.set_uniforms(t=t, base_image=textures[0])
+                for name, source in shader.bound_uniforms.items():
+                    if source == 'time':
+                        shader.uniforms[name] = time.time() - t0
+                    elif source == 'previous_frame':
+                        shader.uniforms[name] = textures[0]
+                    elif source == 'resolution':
+                        shader.uniforms[name] = map(float, shader.resolution);
+                    elif source == 'mouse':
+                        shader.uniforms[name] = get_rel_mouse();
+                    else:
+                        raise RuntimeError('invalid uniform mapping %s <- %s' % (name, source))
+
+                shader.set_uniforms()
 
                 # render
                 texture_rect(aspect)
@@ -92,7 +107,7 @@ def main(args):
         if n_samples % args.refresh_every == 0:
             # render from texture 0
             with textures[1].bind():
-                texture_rect(aspect, 1.0 / n_samples)
+                texture_rect(aspect)
 
             pygame.display.flip()
 

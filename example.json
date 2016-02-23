@@ -2,7 +2,10 @@
     "resolution": [1024, 768],
     "source_path": "example.glsl",
     "uniforms": {
-        "t": 0.0,
-        "radius": 0.3
+        "t": "time",
+        "resolution": "resolution",
+        "base_image": "previous_frame",
+        "radius": 0.3,
+        "mouse": "mouse"
     }
 }

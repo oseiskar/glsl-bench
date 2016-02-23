@@ -1,4 +1,7 @@
 
+#define M_PI 3.14159265358979323846
+
+uniform vec2 mouse;
 uniform vec2 resolution;
 uniform float radius;
 uniform float t;
@@ -7,16 +10,6 @@ uniform sampler2D base_image;
 varying vec3 pos;
 
 #define SQ(x) ((x)*(x))
-#define FOV_MULT 3.0
-const vec3 cam_x = vec3(1.0, 0.0, 0.0);
-const vec3 cam_y = vec3(0.0, 0.0, 1.0);
-const vec3 cam_z = vec3(0.0, 1.0, 0.0);
-const vec3 cam_pos = vec3(0.0, -4.0, 0.5);
-
-const vec3 sphere_pos = vec3(0.0, 0.0, 0.5);
-const float sphere_r = 0.5;
-const vec3 light_pos = vec3(-1.0, -2.0, 1.0);
-const vec3 sphere_diffuse = vec3(1.0, 0.3, 0.4);
 
 float sphere_intersection(vec3 pos, vec3 ray, vec3 sphere_pos, float sphere_r) {
 
@@ -34,11 +27,32 @@ float sphere_intersection(vec3 pos, vec3 ray, vec3 sphere_pos, float sphere_r) {
 
 void main() {
 
+    // rotating camera
+    float cam_theta = mouse.x * 2.0*M_PI;
+    float cam_phi = (mouse.y-0.5) * M_PI;
+    const float cam_dist = 6.0;
+    vec3 camera_target = vec3(0.0, 0.0, 0.5);
+
+    float sphere_r = 0.5 + sin(t*1.5)*0.2;
+    const vec3 light_pos = vec3(1.0, 2.0, 1.0);
+    const vec3 sphere_diffuse = vec3(1.0, 0.3, 0.4);
+    vec3 sphere_pos = vec3(sin(t*1.0), cos(t*2.0), 0.5 + sin(t*0.7));
+
+    vec3 cam_z = vec3(cos(cam_theta), sin(cam_theta), 0.0);
+    vec3 cam_x = vec3(cam_z.y, -cam_z.x, 0.0);
+    vec3 cam_y, cam_pos;
+
+    cam_z = cos(cam_phi)*cam_z + vec3(0,0,sin(cam_phi));
+    cam_y = cross(cam_x, cam_z);
+    cam_pos = -cam_z * cam_dist + camera_target;
+
+    // raytracer
+    const float FOV_MULT = 3.0;
     vec3 ray = normalize(pos.x*cam_x + pos.y*cam_y + FOV_MULT*cam_z);
 
     float isec_dist = sphere_intersection(cam_pos, ray, sphere_pos, sphere_r);
 
-    vec3 cur_color = vec3(0.5, 0.5, 0.5);
+    vec3 cur_color = vec3(0.3, 0.3, 0.3);
 
     if (isec_dist > 0.0) {
         vec3 isec_point = cam_pos + ray*isec_dist;
@@ -50,5 +64,6 @@ void main() {
     }
 
     vec3 base_color = texture2D(base_image, gl_FragCoord.xy / resolution.xy).xyz;
-    gl_FragColor = vec4(base_color + cur_color, 1.0);
+    const float motion_blur = 0.4;
+    gl_FragColor = vec4(mix(base_color, cur_color, 1.0-motion_blur), 1.0);
 }

@@ -27,13 +27,17 @@ def guess_gl_postfix(value):
 
     return '%d%s' % (count, letter)
 
-def auto_gl_func(prefix, value):
-    name = prefix + guess_gl_postfix(value)
-    return globals()[name]
-
 def auto_gl_call(prefix, value, before_args=[], after_args=[]):
     args = list(before_args) + list(numpy.ravel(value)) + list(after_args)
-    auto_gl_func(prefix, value)(*args)
+
+    func_name = prefix + guess_gl_postfix(value)
+    func = globals()[func_name]
+
+    try:
+        func(*args)
+    except ctypes.ArgumentError as err:
+        raise RuntimeError("Failed to call %s with args %s: %s" % \
+            (func_name, str(args), str(err)))
 
 class Shader:
     @staticmethod
@@ -42,9 +46,7 @@ class Shader:
 
     def __init__(self, json_data):
         self.resolution = json_data['resolution']
-        self.uniforms = json_data['uniforms']
-
-        self._add_built_in_uniforms()
+        self._initialize_uniforms(json_data['uniforms'])
         self._source = read_file(json_data['source_path'])
 
         self._texture_units = {}
@@ -57,9 +59,15 @@ class Shader:
         self._build_program()
         self._find_uniforms()
 
-    def _add_built_in_uniforms(self):
-        self.uniforms['resolution'] = [float(x) for x in self.resolution]
-        self.uniforms['base_image'] = None
+    def _initialize_uniforms(self, json_uniforms):
+        self.uniforms = {}
+        self.bound_uniforms = {}
+        for name, value in json_uniforms.items():
+                if isinstance(value, basestring) or isinstance(value, dict):
+                    self.bound_uniforms[name] = value
+                    self.uniforms[name] = None
+                else:
+                    self.uniforms[name] = value
 
     def _build_program(self):
         self._gl_handle = compile_fragment_shader_only(self._source)
@@ -98,6 +106,7 @@ class Shader:
             self.uniforms[name] = value
 
         for name, value in self.uniforms.items():
+            if value is None: continue
             if isinstance(value, Texture):
                 self._set_texture(name, value)
             else:
