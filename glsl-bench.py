@@ -3,14 +3,15 @@ import pygame
 import pygame.locals
 import numpy
 import time, sys, os, argparse
+import json
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
 import scipy.misc
 
-from gl_objects import Shader, Texture, Framebuffer
 from gl_boilerplate import texture_rect
+from gl_objects import Texture, Framebuffer, Shader
 
 def parse_command_line_arguments():
     arg_parser = argparse.ArgumentParser()
@@ -22,10 +23,33 @@ def parse_command_line_arguments():
     arg_parser.add_argument('shader_file')
     return arg_parser.parse_args()
 
+def read_file(filename):
+    with open(filename) as f:
+        return f.read()
+
+class ConfigurableShader(Shader):
+    def __init__(self, json_path):
+        json_data = json.loads(read_file(json_path))
+        source = read_file(json_data['source_path'])
+
+        uniforms = self._initialize_uniforms(json_data['uniforms'])
+        Shader.__init__(self, json_data['resolution'], source, uniforms)
+
+    def _initialize_uniforms(self, json_uniforms):
+        uniforms = {}
+        self.bound_uniforms = {}
+        for name, value in json_uniforms.items():
+            if isinstance(value, basestring) or isinstance(value, dict):
+                self.bound_uniforms[name] = value
+                uniforms[name] = None
+            else:
+                uniforms[name] = value
+        return uniforms
+
 def main(args):
     t0 = time.time()
 
-    shader = Shader.new_from_file(args.shader_file)
+    shader = ConfigurableShader(args.shader_file)
 
     window_resolution = shader.resolution
     if args.preview_resolution is not None:

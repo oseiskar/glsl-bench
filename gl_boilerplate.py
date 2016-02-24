@@ -73,3 +73,27 @@ PASSTHROUGH_VERTEX_SHADER = '''
 
 def compile_fragment_shader_only(source):
     return compile_program(PASSTHROUGH_VERTEX_SHADER, source)
+
+def guess_gl_postfix(value):
+    vals = numpy.ravel(value)
+    count = len(vals)
+    proto_value = vals[0]
+
+    if isinstance(proto_value, int):
+        letter = 'i'
+    else:
+        letter = 'f'
+
+    return '%d%s' % (count, letter)
+
+def auto_gl_call(prefix, value, before_args=[], after_args=[]):
+    args = list(before_args) + list(numpy.ravel(value)) + list(after_args)
+
+    func_name = prefix + guess_gl_postfix(value)
+    func = globals()[func_name]
+
+    try:
+        func(*args)
+    except ctypes.ArgumentError as err:
+        raise RuntimeError("Failed to call %s with args %s: %s" % \
+            (func_name, str(args), str(err)))
