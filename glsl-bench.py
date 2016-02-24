@@ -32,6 +32,12 @@ class ConfigurableShader(Shader):
         json_data = json.loads(read_file(json_path))
         source = read_file(json_data['source_path'])
 
+        template_params = json_data.get('mustache', None)
+        if template_params is not None:
+            import pystache
+            source = pystache.render(source, template_params)
+            #with open('out.glsl', 'w') as f: f.write(source)
+
         uniforms = self._initialize_uniforms(json_data['uniforms'])
         Shader.__init__(self, json_data['resolution'], source, uniforms)
 
