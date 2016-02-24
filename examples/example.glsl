@@ -6,6 +6,7 @@ uniform vec2 resolution;
 uniform float radius;
 uniform float t;
 uniform sampler2D base_image;
+uniform sampler2D classy_texture;
 
 varying vec3 pos;
 
@@ -60,10 +61,12 @@ void main() {
         vec3 light_dir = normalize(light_pos - isec_point);
 
         float lightness = max(dot(light_dir, isec_normal), 0.0);
-        cur_color = lightness * sphere_diffuse;
+
+        vec2 tex_coord = isec_normal.xz * 0.5 + 0.5;
+        cur_color = lightness * texture2D(classy_texture, tex_coord);
     }
 
     vec3 base_color = texture2D(base_image, gl_FragCoord.xy / resolution.xy).xyz;
-    const float motion_blur = 0.4;
+    const float motion_blur = 0.95;
     gl_FragColor = vec4(mix(base_color, cur_color, 1.0-motion_blur), 1.0);
 }

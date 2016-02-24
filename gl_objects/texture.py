@@ -20,6 +20,9 @@ class Texture:
             w = content.shape[1]
             h = content.shape[0]
 
+            if len(content.shape) > 1:
+                content = content[::-1,...] # y-axis is flipped?
+
         self.w = w
         self.h = h
         self._gl_handle = glGenTextures(1)
@@ -37,3 +40,16 @@ class Texture:
         glBindTexture( GL_TEXTURE_2D, self._gl_handle )
         yield
         glBindTexture( GL_TEXTURE_2D, 0 )
+
+    @staticmethod
+    def load(filename):
+        from scipy import misc
+        data = misc.imread(filename)
+        if len(data.shape) == 0:
+            raise RuntimeError("Failed to load image " + filename)
+            # ... but instead of raising an exception, PIL decided to give us
+            # this bullshit 0-dimensional array :(
+
+        data = data / 255.0
+
+        return Texture(content=data)

@@ -27,35 +27,37 @@ def read_file(filename):
     with open(filename) as f:
         return f.read()
 
-class ConfigurableShader(Shader):
-    def __init__(self, json_path):
-        json_data = json.loads(read_file(json_path))
-        source = read_file(json_data['source_path'])
+def get_uniform_values_and_mappings(json_uniforms):
+    uniforms = {}
+    bound_uniforms = {}
+    for name, value in json_uniforms.items():
+        if isinstance(value, basestring) or isinstance(value, dict):
+            bound_uniforms[name] = value
+            uniforms[name] = None
+        else:
+            uniforms[name] = value
+    return (uniforms, bound_uniforms)
 
-        template_params = json_data.get('mustache', None)
-        if template_params is not None:
-            import pystache
-            source = pystache.render(source, template_params)
-            #with open('out.glsl', 'w') as f: f.write(source)
+def create_shader_and_uniform_mappings(json_path):
 
-        uniforms = self._initialize_uniforms(json_data['uniforms'])
-        Shader.__init__(self, json_data['resolution'], source, uniforms)
+    json_data = json.loads(read_file(json_path))
+    source = read_file(json_data['source_path'])
 
-    def _initialize_uniforms(self, json_uniforms):
-        uniforms = {}
-        self.bound_uniforms = {}
-        for name, value in json_uniforms.items():
-            if isinstance(value, basestring) or isinstance(value, dict):
-                self.bound_uniforms[name] = value
-                uniforms[name] = None
-            else:
-                uniforms[name] = value
-        return uniforms
+    template_params = json_data.get('mustache', None)
+    if template_params is not None:
+        import pystache
+        source = pystache.render(source, template_params)
+        #with open('out.glsl', 'w') as f: f.write(source)
+
+    uniforms, mappings = get_uniform_values_and_mappings(json_data['uniforms'])
+
+    shader = Shader(json_data['resolution'], source, uniforms)
+    return (shader, mappings)
 
 def main(args):
     t0 = time.time()
 
-    shader = ConfigurableShader(args.shader_file)
+    shader, uniform_mappings = create_shader_and_uniform_mappings(args.shader_file)
 
     window_resolution = shader.resolution
     if args.preview_resolution is not None:
@@ -93,13 +95,27 @@ def main(args):
 
         if args.png_output_file is not None:
             # normalize and save as 8-bit channels (PNG)
-            result_image = numpy.clip(result_image / n_samples, 0.0, 1.0)*255
+            result_image = numpy.clip(result_image, 0.0, 1.0)*255
             result_image = result_image.astype(numpy.uint8)
 
             scipy.misc.imsave(args.png_output_file, result_image)
 
     glEnable( GL_TEXTURE_2D )
     n_samples = 0
+
+    # handle compile time uniforms
+    for name in uniform_mappings.keys()[::]:
+        source = uniform_mappings[name]
+        if isinstance(source, dict):
+            # dict is texture
+            shader.uniforms[name] = Texture.load(source['file'])
+        elif source == 'resolution':
+            shader.uniforms[name] = map(float, shader.resolution)
+        else:
+            # the rest are run-time mapped values
+            continue
+
+        del uniform_mappings[name]
 
     def get_rel_mouse():
         x,y = pygame.mouse.get_pos()
@@ -121,13 +137,11 @@ def main(args):
         with shader.use_program():
             with framebuffer.render_to_texture(textures[1]):
 
-                for name, source in shader.bound_uniforms.items():
+                for name, source in uniform_mappings.items():
                     if source == 'time':
                         shader.uniforms[name] = time.time() - t0
                     elif source == 'previous_frame':
                         shader.uniforms[name] = textures[0]
-                    elif source == 'resolution':
-                        shader.uniforms[name] = map(float, shader.resolution)
                     elif source == 'mouse':
                         shader.uniforms[name] = get_absolute_mouse()
                     elif source == 'relative_mouse':

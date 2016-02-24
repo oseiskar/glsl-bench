@@ -6,6 +6,9 @@
         "resolution": "resolution",
         "base_image": "previous_frame",
         "radius": 0.3,
-        "mouse": "relative_mouse"
+        "mouse": "relative_mouse",
+        "classy_texture": {
+            "file": "examples/example.jpg"
+        }
     }
 }

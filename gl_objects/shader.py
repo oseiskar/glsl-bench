@@ -49,12 +49,15 @@ class Shader:
         glActiveTexture(GL_TEXTURE0 + gl_texture_unit)
         glBindTexture(GL_TEXTURE_2D, value._gl_handle)
         glUniform1i(self._uniform_handles.get(name), gl_texture_unit)
+        # it seems that this unit should be activated before using
+        # the framebuffer
+        glActiveTexture(GL_TEXTURE0)
 
     def _assign_texture(self, name):
         if name not in self._texture_units:
-            new_unit = len(self._texture_units)
+            new_unit = len(self._texture_units) + 1 # save 1 for the FB
             self._texture_units[name] = new_unit
-            #print 'associated', name, 'with GL texture unit', new_unit
+            # print 'associated', name, 'with GL texture unit', new_unit
         return self._texture_units[name]
 
     def set_uniforms(self, **kwargs):

@@ -31,5 +31,5 @@ class Framebuffer:
         with self._bind():
             texture_data = glReadPixels(0, 0, self.w, self.h, GL_RGB, GL_FLOAT)
             texture_data = numpy.reshape(texture_data, (self.h, self.w, 3))
-            texture_data = texture_data[::-1,:,:]
+            texture_data = texture_data[::-1,...]
             return texture_data

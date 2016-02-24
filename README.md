@@ -10,7 +10,9 @@ functionality but runs locally.
 
 **Features**
 
- * Binding variables such as `mouse`, `resolution`, `time` and `previous_frame` to GLSL uniforms using a JSON configuration file.
+ * Binding variables such as `mouse`, `time` and `previous_frame` to GLSL uniforms using a JSON configuration file.
+ * Specifying textures in configuration files
  * Image output in raw float (`.npy`) and PNG formats
+ * Compile time templating with [Mustache](https://mustache.github.io/)
 
 **Dependencies**: `pygame`, `scipy`, `pystache` (if using templates)
