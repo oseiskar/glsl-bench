@@ -1,6 +1,6 @@
 {
     "resolution": [1024, 768],
-    "source_path": "examples/icecream.glsl",
+    "source_path": "shader.glsl",
     "uniforms": {
         "iGlobalTime": "time",
         "iResolution": "resolution",

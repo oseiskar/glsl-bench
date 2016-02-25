@@ -4,6 +4,7 @@ import pygame.locals
 import numpy
 import time, sys, os, argparse
 import json
+from contextlib import contextmanager
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -27,6 +28,23 @@ def read_file(filename):
     with open(filename) as f:
         return f.read()
 
+class DirChanger:
+    def __init__(self, filename):
+        self.dir = os.path.abspath(os.path.dirname(filename))
+
+    @contextmanager
+    def as_working_dir(self):
+        current = os.getcwd()
+        try:
+            os.chdir(self.dir)
+            yield
+        finally:
+            os.chdir(current)
+
+    def read_file(self, filename):
+        with self.as_working_dir():
+            return read_file(filename)
+
 def get_uniform_values_and_mappings(json_uniforms):
     uniforms = {}
     bound_uniforms = {}
@@ -38,26 +56,28 @@ def get_uniform_values_and_mappings(json_uniforms):
             uniforms[name] = value
     return (uniforms, bound_uniforms)
 
-def create_shader_and_uniform_mappings(json_path):
+def get_shader_uniform_mappings_and_working_dir(json_path):
 
-    json_data = json.loads(read_file(json_path))
-    source = read_file(json_data['source_path'])
+        json_data = json.loads(read_file(json_path))
+        shader_dir = DirChanger(json_path)
 
-    template_params = json_data.get('mustache', None)
-    if template_params is not None:
-        import pystache
-        source = pystache.render(source, template_params)
-        #with open('out.glsl', 'w') as f: f.write(source)
+        source = shader_dir.read_file(json_data['source_path'])
 
-    uniforms, mappings = get_uniform_values_and_mappings(json_data['uniforms'])
+        template_params = json_data.get('mustache', None)
+        if template_params is not None:
+            import pystache
+            source = pystache.render(source, template_params)
+            #with open('out.glsl', 'w') as f: f.write(source)
 
-    shader = Shader(json_data['resolution'], source, uniforms)
-    return (shader, mappings)
+        uniforms, mappings = get_uniform_values_and_mappings(json_data['uniforms'])
+        shader = Shader(json_data['resolution'], source, uniforms)
+
+        return (shader, mappings, shader_dir)
 
 def main(args):
     t0 = time.time()
 
-    shader, uniform_mappings = create_shader_and_uniform_mappings(args.shader_file)
+    shader, uniform_mappings, shader_dir = get_shader_uniform_mappings_and_working_dir(args.shader_file)
 
     window_resolution = shader.resolution
     if args.preview_resolution is not None:
@@ -108,7 +128,8 @@ def main(args):
         source = uniform_mappings[name]
         if isinstance(source, dict):
             # dict is texture
-            shader.uniforms[name] = Texture.load(source['file'])
+            with shader_dir.as_working_dir():
+                shader.uniforms[name] = Texture.load(source['file'])
         elif source == 'resolution':
             shader.uniforms[name] = map(float, shader.resolution)
         else:

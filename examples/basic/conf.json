@@ -1,6 +1,6 @@
 {
     "resolution": [1024, 768],
-    "source_path": "examples/example.glsl",
+    "source_path": "shader.glsl",
     "uniforms": {
         "t": "time",
         "resolution": "resolution",
@@ -8,7 +8,7 @@
         "radius": 0.3,
         "mouse": "relative_mouse",
         "classy_texture": {
-            "file": "examples/example.jpg"
+            "file": "texture.jpg"
         }
     }
 }
