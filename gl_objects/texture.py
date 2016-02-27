@@ -50,6 +50,10 @@ class Texture:
             # ... but instead of raising an exception, PIL decided to give us
             # this bullshit 0-dimensional array :(
 
+        # drop alpha
+        if data.shape[2] == 4: data = data[..., 0:3]
+
+        print filename, data.shape
         data = data / 255.0
 
         return Texture(content=data)
