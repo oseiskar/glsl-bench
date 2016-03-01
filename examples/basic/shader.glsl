@@ -36,7 +36,6 @@ void main() {
 
     float sphere_r = 0.5 + sin(t*1.5)*0.2;
     const vec3 light_pos = vec3(1.0, 2.0, 1.0);
-    const vec3 sphere_diffuse = vec3(1.0, 0.3, 0.4);
     vec3 sphere_pos = vec3(sin(t*1.0), cos(t*2.0), 0.5 + sin(t*0.7));
 
     vec3 cam_z = vec3(cos(cam_theta), sin(cam_theta), 0.0);
@@ -68,5 +67,5 @@ void main() {
 
     vec3 base_color = texture2D(base_image, gl_FragCoord.xy / resolution.xy).xyz;
     const float motion_blur = 0.95;
-    gl_FragColor = vec4(mix(base_color, cur_color, 1.0-motion_blur), 1.0);
+    gl_FragColor = vec4(base_color*motion_blur + cur_color *(1.0-motion_blur), 1.0);
 }

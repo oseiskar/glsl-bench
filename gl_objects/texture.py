@@ -52,8 +52,6 @@ class Texture:
 
         # drop alpha
         if data.shape[2] == 4: data = data[..., 0:3]
-
-        print filename, data.shape
         data = data / 255.0
 
         return Texture(content=data)

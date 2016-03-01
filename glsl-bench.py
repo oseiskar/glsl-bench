@@ -56,7 +56,7 @@ def get_uniform_values_and_mappings(json_uniforms):
             uniforms[name] = value
     return (uniforms, bound_uniforms)
 
-def get_shader_uniform_mappings_and_working_dir(json_path):
+def load_shader(json_path):
 
         json_data = json.loads(read_file(json_path))
         shader_dir = DirChanger(json_path)
@@ -72,12 +72,34 @@ def get_shader_uniform_mappings_and_working_dir(json_path):
         uniforms, mappings = get_uniform_values_and_mappings(json_data['uniforms'])
         shader = Shader(json_data['resolution'], source, uniforms)
 
-        return (shader, mappings, shader_dir)
+        # TODO not a good approach
+        shader.params = json_data
+        shader.dir = shader_dir
+        shader.uniform_mappings = mappings
+
+        return shader
+
+def generate_random(command):
+    parts = command.split('_')
+
+    assert(len(parts) <= 3)
+    assert(parts[0] == 'random')
+
+    distribution = parts[1]
+    if distribution == 'gauss': distribution = 'normal'
+
+    if len(parts) > 1:
+        size = int(parts[2])
+    else:
+        size = 1
+
+    func = getattr(numpy.random, distribution)
+    return [func() for _ in xrange(size)]
 
 def main(args):
     t0 = time.time()
 
-    shader, uniform_mappings, shader_dir = get_shader_uniform_mappings_and_working_dir(args.shader_file)
+    shader = load_shader(args.shader_file)
 
     window_resolution = shader.resolution
     if args.preview_resolution is not None:
@@ -89,9 +111,15 @@ def main(args):
 
     shader.build()
 
+    monte_carlo = shader.params.get('monte_carlo')
+
     def new_texture():
+        extra_args = {}
+        # in Monte Carlo mode, use float32 textures
+        if shader.params.get('float_buffers') or monte_carlo:
+            extra_args['internal_format'] = GL_RGB32F
         return Texture(*shader.resolution, \
-            interpolation=GL_NEAREST, internal_format=GL_RGB32F, content=0.0)
+            interpolation=GL_NEAREST, content=0.0, **extra_args)
 
     textures = [new_texture() for _ in range(2)]
     framebuffer = Framebuffer(*shader.resolution)
@@ -104,10 +132,14 @@ def main(args):
     glMatrixMode(GL_MODELVIEW);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 
+    n_samples = 0
+
     def save_results():
 
         # read image data from the framebuffer
         result_image = framebuffer.read()
+
+        if monte_carlo: result_image = result_image / n_samples
 
         if args.numpy_output_file is not None:
             # save raw 32-bit float / HDR channels as a numpy array
@@ -121,14 +153,13 @@ def main(args):
             scipy.misc.imsave(args.png_output_file, result_image)
 
     glEnable( GL_TEXTURE_2D )
-    n_samples = 0
 
     # handle compile time uniforms
-    for name in uniform_mappings.keys()[::]:
-        source = uniform_mappings[name]
+    for name in shader.uniform_mappings.keys()[::]:
+        source = shader.uniform_mappings[name]
         if isinstance(source, dict):
             # dict is texture
-            with shader_dir.as_working_dir():
+            with shader.dir.as_working_dir():
                 shader.uniforms[name] = Texture.load(source['file'])
         elif source == 'resolution':
             shader.uniforms[name] = map(float, shader.resolution)
@@ -136,7 +167,7 @@ def main(args):
             # the rest are run-time mapped values
             continue
 
-        del uniform_mappings[name]
+        del shader.uniform_mappings[name]
 
     def get_rel_mouse():
         x,y = pygame.mouse.get_pos()
@@ -158,22 +189,31 @@ def main(args):
         with shader.use_program():
             with framebuffer.render_to_texture(textures[1]):
 
-                for name, source in uniform_mappings.items():
+                for name, source in shader.uniform_mappings.items():
                     if source == 'time':
-                        shader.uniforms[name] = time.time() - t0
+                        value = time.time() - t0
                     elif source == 'previous_frame':
-                        shader.uniforms[name] = textures[0]
+                        value = textures[0]
                     elif source == 'mouse':
-                        shader.uniforms[name] = get_absolute_mouse()
+                        value = get_absolute_mouse()
                     elif source == 'relative_mouse':
-                        shader.uniforms[name] = get_rel_mouse()
+                        value = get_rel_mouse()
+                    elif 'random_' in source:
+                        value = generate_random(source)
                     else:
                         raise RuntimeError('invalid uniform mapping %s <- %s' % (name, source))
 
+                    shader.uniforms[name] = value
+
                 shader.set_uniforms()
 
+                if monte_carlo:
+                    color_scale = 1.0 / n_samples
+                else:
+                    color_scale = 1.0
+
                 # render
-                texture_rect(aspect)
+                texture_rect(aspect, color_scale)
 
         if n_samples % args.refresh_every == 0:
             # render from texture 0
