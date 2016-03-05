@@ -2,14 +2,13 @@
     "resolution": [1024, 768],
     "source_path": "shader.glsl",
     "monte_carlo": true,
+    "refresh_every": 20,
     "uniforms": {
-        "t": "time",
         "resolution": "resolution",
         "base_image": "previous_frame",
-        "radius": 0.3,
-        "mouse": "relative_mouse",
         "tent_filter": "random_uniform_2",
         "random_direction_1": "random_normal_3",
-        "random_direction_2": "random_normal_3"
+        "random_direction_2": "random_normal_3",
+        "random_direction_3": "random_normal_3"
     }
 }

@@ -1,15 +1,12 @@
 
 #define M_PI 3.14159265358979323846
+#define DEG2RAD(x) ((x)/180.0*M_PI)
 
-uniform vec2 mouse;
 uniform vec2 resolution;
-uniform float radius;
-uniform float t;
 uniform vec2 tent_filter;
-uniform vec3 random_direction_1, random_direction_2;
+uniform vec3 random_direction_1, random_direction_2, random_direction_3;
 
 uniform sampler2D base_image;
-uniform sampler2D classy_texture;
 
 #define SQ(x) ((x)*(x))
 #define NO_INTERSECTION vec4(0.0, 0.0, 0.0, -1.0)
@@ -37,6 +34,21 @@ vec4 plane_intersection(vec3 pos, vec3 ray, vec3 plane_normal, float plane_h) {
     return vec4(plane_normal, dist);
 }
 
+vec4 box_interior_intersection(vec3 pos, vec3 ray, vec3 box_size, vec3 box_center) {
+    vec3 corner = box_size*sign(ray) + box_center;
+    vec3 diff = pos - corner;
+    vec3 dists = -diff / ray;
+
+    vec3 normal = vec3(0.0, 0.0, 1.0);
+    float dist = min(dists.x, min(dists.y, dists.z));
+
+    if (dist == dists.x) normal = vec3(1.0, 0.0, 0.0);
+    else if (dist == dists.y) normal = vec3(0.0, 1.0, 0.0);
+
+    normal = normal * -sign(ray);
+    return vec4(normal, dist);
+}
+
 float tent_filter_transformation(float x) {
     x *= 2.0;
     if (x < 1.0) return sqrt(x) - 1.0;
@@ -52,49 +64,61 @@ vec2 get_ccd_pos(vec2 screen_pos) {
 }
 
 #define OBJ_NONE 0
-#define OBJ_SPHERE 1
-#define OBJ_PLANE 2
-#define OBJ_LIGHT 3
+#define OBJ_SPHERE_1 1
+#define OBJ_SPHERE_2 2
+#define OBJ_BOX 3
+#define OBJ_LIGHT_1 4
+#define OBJ_LIGHT_2 5
 
-#define N_BOUNCES 2
+#define REFLECTIVE_OBJECT OBJ_SPHERE_2
+
+#define N_BOUNCES 3
+
+#define IMAGE_BRIGHTNESS 60.0
+#define ROOM_H 2.0
+#define ROOM_W 5.0
 
 void main() {
 
     // scene geometry
-    const vec3 light_pos = vec3(-5.0, 2.0, 8.0);
-    const float light_r = 2.5;
-    const vec3 light_emission = vec3(1.0, 1.0, 1.0);
+    const vec3 light_1_pos = vec3(-ROOM_W*0.5, 0.0, ROOM_H);
+    const vec3 light_2_pos = vec3(0.0, ROOM_W*0.5, ROOM_H);
+    const float light_r = 0.4;
+    const vec3 light_1_emission = vec3(0.8, 0.8, 1.0);
+    const vec3 light_2_emission = vec3(1.0, 0.8, 0.6);
 
-    const vec3 sphere_pos = vec3(0.0, 0.0, 0.5);
-    const float sphere_r = 0.5;
-    const vec3 sphere_diffuse = vec3(1.0, 0.3, 0.4);
+    const vec3 sphere_1_pos = vec3(0.0, 0.0, 0.5);
+    const float sphere_1_r = 0.5;
+    const vec3 sphere_1_diffuse = vec3(.5, .8, .9);
 
-    const float plane_h = -0.0;
-    const vec3 plane_normal = vec3(0.0, 0.0, 1.0);
-    const vec3 plane_diffuse = vec3(0.7, 0.7, 0.7);
+    const vec3 sphere_2_pos = vec3(-1.1, 0.3, 0.25);
+    const float sphere_2_r = 0.25;
+
+    const vec3 box_size = vec3(ROOM_W, ROOM_W, ROOM_H)*0.5;
+    const vec3 box_diffuse = vec3(1., 1., 1.)*.7;
+    const vec3 box_center = vec3(0.0, 0.0, ROOM_H*0.5);
 
     // define camera
-    const float cam_theta = 0.0;
-    const float cam_phi = 0.0;
-    const float cam_dist = 6.0;
-    vec3 camera_target = vec3(0.0, 0.0, 0.5);
+    const float fov_angle = DEG2RAD(50.0);
+    const float cam_theta = DEG2RAD(300.0);
+    const float cam_phi = DEG2RAD(5.0);
+    const float cam_dist = 2.6;
+    vec3 camera_target = vec3(-0.5, 0.0, 0.35);
 
     vec3 cam_z = vec3(cos(cam_theta), sin(cam_theta), 0.0);
     vec3 cam_x = vec3(cam_z.y, -cam_z.x, 0.0);
     vec3 cam_y, cam_pos;
 
-    cam_z = cos(cam_phi)*cam_z + vec3(0,0,sin(cam_phi));
+    cam_z = cos(cam_phi)*cam_z + vec3(0,0,-sin(cam_phi));
     cam_y = cross(cam_x, cam_z);
     cam_pos = -cam_z * cam_dist + camera_target;
 
-    const float FOV_MULT = 3.0;
-
     // ray location on image surface after applying tent filter
     vec2 ccd_pos = get_ccd_pos(gl_FragCoord.xy);
-    vec3 ray = normalize(ccd_pos.x*cam_x + ccd_pos.y*cam_y + FOV_MULT*cam_z);
+    vec3 ray = normalize(ccd_pos.x*cam_x + ccd_pos.y*cam_y + 1.0/tan(fov_angle*0.5)*cam_z);
     vec3 ray_pos = cam_pos;
 
-    vec3 ray_color = vec3(1.0, 1.0, 1.0)*10.0;
+    vec3 ray_color = vec3(1.0, 1.0, 1.0) * IMAGE_BRIGHTNESS;
     int prev_object = OBJ_NONE;
 
     vec3 cur_color = vec3(0.0, 0.0, 0.0);
@@ -110,30 +134,46 @@ void main() {
         vec3 diffuse = vec3(0.0, 0.0, 0.0);
         vec3 emission = vec3(0.0, 0.0, 0.0);
 
-        if (prev_object != OBJ_SPHERE) {
-            cur_isec = sphere_intersection(ray_pos, ray, sphere_pos, sphere_r);
+        if (prev_object != OBJ_SPHERE_1) {
+            cur_isec = sphere_intersection(ray_pos, ray, sphere_1_pos, sphere_1_r);
             if (cur_isec.w > 0.0) {
                 intersection = cur_isec;
-                which_object = OBJ_SPHERE;
-                diffuse = sphere_diffuse;
+                which_object = OBJ_SPHERE_1;
+                diffuse = sphere_1_diffuse;
             }
         }
 
-        if (prev_object != OBJ_PLANE) {
-            cur_isec = plane_intersection(ray_pos, ray, plane_normal, plane_h);
+        if (prev_object != OBJ_SPHERE_2) {
+            cur_isec = sphere_intersection(ray_pos, ray, sphere_2_pos, sphere_2_r);
             if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
                 intersection = cur_isec;
-                which_object = OBJ_PLANE;
-                diffuse = plane_diffuse;
+                which_object = OBJ_SPHERE_2;
             }
         }
 
-        if (prev_object != OBJ_LIGHT) {
-            cur_isec = sphere_intersection(ray_pos, ray, light_pos, light_r);
+        // the box interior is non-convex and can handle that
+        cur_isec = box_interior_intersection(ray_pos, ray, box_size, box_center);
+        if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
+            intersection = cur_isec;
+            which_object = OBJ_BOX;
+            diffuse = box_diffuse;
+        }
+
+        if (prev_object != OBJ_LIGHT_1) {
+            cur_isec = sphere_intersection(ray_pos, ray, light_1_pos, light_r);
             if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
                 intersection = cur_isec;
-                which_object = OBJ_LIGHT;
-                emission = light_emission;
+                which_object = OBJ_LIGHT_1;
+                emission = light_1_emission;
+            }
+        }
+
+        if (prev_object != OBJ_LIGHT_2) {
+            cur_isec = sphere_intersection(ray_pos, ray, light_2_pos, light_r);
+            if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
+                intersection = cur_isec;
+                which_object = OBJ_LIGHT_2;
+                emission = light_2_emission;
             }
         }
 
@@ -146,13 +186,20 @@ void main() {
             vec3 normal = intersection.xyz;
             ray_pos += intersection.w * ray;
 
-            // sample a new direction
-            if (bounce == 0) ray = random_direction_1;
-            else ray = random_direction_2;
+            if (which_object == REFLECTIVE_OBJECT) {
+                // full reflection
+                ray = ray - 2.0*dot(normal, ray)*normal;
+            } else {
+                // sample a new direction
+                vec3 rand_dir;
+                if (bounce == 0) rand_dir = random_direction_1;
+                if (bounce == 1) rand_dir = random_direction_2;
+                else rand_dir = random_direction_3;
 
-            ray = normalize(ray);
-            if (dot(ray, normal) < 0.0) ray = -ray;
-            ray_color *= dot(normal, ray) * diffuse;
+                ray = normalize(rand_dir);
+                if (dot(ray, normal) < 0.0) ray = -ray;
+                ray_color *= dot(normal, ray) * diffuse;
+            }
         }
     }
 

@@ -16,7 +16,7 @@ from gl_objects import Texture, Framebuffer, Shader
 
 def parse_command_line_arguments():
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-refresh', '--refresh_every', type=int, default=1)
+    arg_parser.add_argument('-refresh', '--refresh_every', type=int)
     arg_parser.add_argument('-np', '--numpy_output_file')
     arg_parser.add_argument('-png', '--png_output_file', default='out.png')
     arg_parser.add_argument('-res', '--preview_resolution')
@@ -134,6 +134,10 @@ def main(args):
 
     n_samples = 0
 
+    refresh_every = shader.params.get('refresh_every', 1)
+    if args.refresh_every is not None:
+        refresh_every = args.refresh_every
+
     def save_results():
 
         # read image data from the framebuffer
@@ -215,7 +219,7 @@ def main(args):
                 # render
                 texture_rect(aspect, color_scale)
 
-        if n_samples % args.refresh_every == 0:
+        if n_samples % refresh_every == 0:
             # render from texture 0
             with textures[1].bind():
                 texture_rect(aspect)
