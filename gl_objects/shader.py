@@ -2,13 +2,7 @@
 Fragment shader + trivial vertex shader
 """
 
-import numpy
 from contextlib import contextmanager
-
-from OpenGL.GL import *
-
-from gl_boilerplate import compile_fragment_shader_only, auto_gl_call
-from texture import Texture
 
 class Shader:
     def __init__(self, resolution, source, uniforms):
@@ -26,9 +20,12 @@ class Shader:
         self._find_uniforms()
 
     def _build_program(self):
+        from gl_boilerplate import compile_fragment_shader_only
         self._gl_handle = compile_fragment_shader_only(self._source)
 
     def _find_uniforms(self):
+        from OpenGL.GL import glGetUniformLocation
+
         self._uniform_handles = { \
             name: glGetUniformLocation(self._gl_handle, str(name)) \
                 for name in self.uniforms.keys() }
@@ -36,15 +33,20 @@ class Shader:
     # these implement the "with shader as ..." statement
     @contextmanager
     def use_program(self):
+        from OpenGL.GL import glUseProgram
         glUseProgram(self._gl_handle)
         yield
         glUseProgram(0)
 
     def _set_uniform(self, name, value):
+        from gl_boilerplate import auto_gl_call
         handle = self._uniform_handles.get(name)
         auto_gl_call('glUniform', value, before_args=[handle])
 
     def _set_texture(self, name, value):
+        from OpenGL.GL import glActiveTexture, glBindTexture, glUniform1i, \
+            GL_TEXTURE0, GL_TEXTURE_2D
+
         gl_texture_unit = self._assign_texture(name)
         glActiveTexture(GL_TEXTURE0 + gl_texture_unit)
         glBindTexture(GL_TEXTURE_2D, value._gl_handle)
@@ -61,6 +63,9 @@ class Shader:
         return self._texture_units[name]
 
     def set_uniforms(self, **kwargs):
+
+        from texture import Texture
+
         for name, value in kwargs.items():
             self.uniforms[name] = value
 

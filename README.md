@@ -6,7 +6,7 @@ functionality but runs locally.
 
 **Usage**
 
-    python glsl-bench.py examples/basic/conf.json
+    python glsl_bench.py examples/basic/conf.json
 
 **Features**
 

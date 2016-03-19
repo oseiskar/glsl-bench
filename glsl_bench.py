@@ -1,20 +1,11 @@
 
-import pygame
-import pygame.locals
-import numpy
-import time, sys, os, argparse
-import json
+import os
 from contextlib import contextmanager
 
-from OpenGL.GL import *
-from OpenGL.GLU import *
-
-import scipy.misc
-
-from gl_boilerplate import texture_rect
-from gl_objects import Texture, Framebuffer, Shader
+from gl_objects import Shader
 
 def parse_command_line_arguments():
+    import argparse
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('-refresh', '--refresh_every', type=int)
     arg_parser.add_argument('-np', '--numpy_output_file')
@@ -58,26 +49,27 @@ def get_uniform_values_and_mappings(json_uniforms):
 
 def load_shader(json_path):
 
-        json_data = json.loads(read_file(json_path))
-        shader_dir = DirChanger(json_path)
+    import json
+    json_data = json.loads(read_file(json_path))
+    shader_dir = DirChanger(json_path)
 
-        source = shader_dir.read_file(json_data['source_path'])
+    source = shader_dir.read_file(json_data['source_path'])
 
-        template_params = json_data.get('mustache', None)
-        if template_params is not None:
-            import pystache
-            source = pystache.render(source, template_params)
-            #with open('out.glsl', 'w') as f: f.write(source)
+    template_params = json_data.get('mustache', None)
+    if template_params is not None:
+        import pystache
+        source = pystache.render(source, template_params)
+        #with open('out.glsl', 'w') as f: f.write(source)
 
-        uniforms, mappings = get_uniform_values_and_mappings(json_data['uniforms'])
-        shader = Shader(json_data['resolution'], source, uniforms)
+    uniforms, mappings = get_uniform_values_and_mappings(json_data['uniforms'])
+    shader = Shader(json_data['resolution'], source, uniforms)
 
-        # TODO not a good approach
-        shader.params = json_data
-        shader.dir = shader_dir
-        shader.uniform_mappings = mappings
+    # TODO not a good approach
+    shader.params = json_data
+    shader.dir = shader_dir
+    shader.uniform_mappings = mappings
 
-        return shader
+    return shader
 
 def generate_random(command):
     parts = command.split('_')
@@ -97,6 +89,11 @@ def generate_random(command):
     return [func() for _ in xrange(size)]
 
 def main(args):
+
+    import time
+    from gl_boilerplate import texture_rect
+    from gl_objects import Texture, Framebuffer
+
     t0 = time.time()
 
     shader = load_shader(args.shader_file)
@@ -154,6 +151,7 @@ def main(args):
             result_image = numpy.clip(result_image, 0.0, 1.0)*255
             result_image = result_image.astype(numpy.uint8)
 
+            import scipy.misc
             scipy.misc.imsave(args.png_output_file, result_image)
 
     glEnable( GL_TEXTURE_2D )
@@ -230,5 +228,13 @@ def main(args):
         textures = textures[::-1]
 
 if __name__ == '__main__':
+
     args = parse_command_line_arguments()
+
+    from OpenGL.GL import *
+    from OpenGL.GLU import *
+    import pygame
+    import pygame.locals
+    import numpy
+
     main(args)
