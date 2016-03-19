@@ -62,7 +62,7 @@ void main() {
         float lightness = max(dot(light_dir, isec_normal), 0.0);
 
         vec2 tex_coord = isec_normal.xz * 0.5 + 0.5;
-        cur_color = lightness * texture2D(classy_texture, tex_coord);
+        cur_color = lightness * texture2D(classy_texture, tex_coord).xyz;
     }
 
     vec3 base_color = texture2D(base_image, gl_FragCoord.xy / resolution.xy).xyz;

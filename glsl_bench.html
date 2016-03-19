@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>GLSL bench</title>
+        <meta charset="utf-8">
+    </head>
+    <body>
+        <script src="js_libs/jquery-2.1.4.min.js"></script>
+        <script src="js_libs/three.min.js"></script>
+        <script src="js_libs/Detector.js"></script>
+
+        <script id="vertex-shader" type="x-shader/x-vertex">
+            varying vec3 pos;
+            void main()    {
+                pos = position;
+                gl_Position = vec4( position, 1.0 );
+            }
+        </script>
+        <script id="fragment-shader" type="x-shader/x-fragment">
+            {{{shader_source}}}
+        </script>
+        <script>
+            window.shader_params = {{{shader_params}}};
+        </script>
+        <script src="glsl_bench.js"></script>
+    </body>
+</html>

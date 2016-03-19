@@ -8,7 +8,7 @@ class Shader:
     def __init__(self, resolution, source, uniforms):
         self.resolution = resolution
         self.uniforms = uniforms
-        self._source = source
+        self.source = source
         self._texture_units = {}
 
     @property
@@ -21,7 +21,7 @@ class Shader:
 
     def _build_program(self):
         from gl_boilerplate import compile_fragment_shader_only
-        self._gl_handle = compile_fragment_shader_only(self._source)
+        self._gl_handle = compile_fragment_shader_only(self.source)
 
     def _find_uniforms(self):
         from OpenGL.GL import glGetUniformLocation
