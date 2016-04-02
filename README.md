@@ -8,6 +8,11 @@ functionality but runs locally.
 
     python glsl_bench.py examples/basic/conf.json
 
+or
+
+    python -m SimpleHTTPServer
+    # open: http://localhost:8000/glsl_bench.html?shader=examples/black-hole/black-hole.json
+
 **Features**
 
  * Binding variables such as `mouse`, `time` and `previous_frame` to GLSL uniforms using a JSON configuration file.

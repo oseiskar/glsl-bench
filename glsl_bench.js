@@ -5,35 +5,37 @@
 
 if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
-var container, scene, camera, renderer, uniformHandler;
+var container, scene, camera, renderer, shader;
 var mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
 
-(function(){
-    uniformHandler = new UniformHandler(window.shader_params.uniforms, init);
-})();
+function startShader(shader_json_filename) {
+    var shader_folder = getFolderName(shader_json_filename);
+    $.getJSON(shader_json_filename, function(shader_params) {
+        shader = new Shader(shader_params, shader_folder);
+    });
+}
 
-function UniformHandler(uniformMappings, readyCallback) {
+function Shader(shader_params, shader_folder) {
+
+    var that = this;
 
     var time0 = new Date().getTime();
     var textures = {};
+    this.source = null;
 
     function checkLoaded() {
         for (var key in textures) if (textures[key] === null) return;
-        readyCallback();
+        if (that.source === null) return;
+        init();
     }
 
-    var texLoader = new THREE.TextureLoader();
-    function loadTexture(symbol, filename, interpolation) {
-        textures[symbol] = null;
-        texLoader.load(filename, function(tex) {
-            tex.magFilter = interpolation;
-            tex.minFilter = interpolation;
-            textures[symbol] = tex;
+    $.ajax(shader_folder + shader_params.source_path,
+        { contentType: 'text/plain' }).done(function (shader_source) {
+            if (shader_params.mustache)
+                shader_source = Mustache.render(shader_source, shader_params.mustache);
+            that.source = shader_source;
             checkLoaded();
         });
-    }
-
-    //loadTexture('galaxy', 'img/milkyway.jpg', THREE.NearestFilter);
 
     function buildFixed(value) {
         if ($.type(value) === "array") {
@@ -86,10 +88,26 @@ function UniformHandler(uniformMappings, readyCallback) {
     }
 
     this.uniforms = {};
+
+    var texLoader = new THREE.TextureLoader();
+    function loadTexture(symbol, filename, interpolation) {
+        textures[symbol] = null;
+        texLoader.load(filename, function(tex) {
+            tex.magFilter = interpolation;
+            tex.minFilter = interpolation;
+            textures[symbol] = tex;
+            that.uniforms[symbol] = {
+                type: "t",
+                value: tex
+            };
+            checkLoaded();
+        });
+    }
+
     var bound_uniforms = {};
 
-    for (var key in uniformMappings) {
-        var val = uniformMappings[key];
+    for (var key in shader_params.uniforms) {
+        var val = shader_params.uniforms[key];
 
         switch ($.type(val)) {
             case "string":
@@ -98,7 +116,7 @@ function UniformHandler(uniformMappings, readyCallback) {
                 this.uniforms[key] = builder.declaration;
                 break;
             case "object": // texture
-                throw "TODO: texture support";
+                loadTexture(key, shader_folder + val.file, THREE.NearestFilter);
                 break;
             default:
                 this.uniforms[key] = buildFixed(val);
@@ -106,17 +124,14 @@ function UniformHandler(uniformMappings, readyCallback) {
         }
     }
 
-    var that = this;
     this.update = function() {
         for (var key in bound_uniforms) {
             bound_uniforms[key].updater(that.uniforms[key]);
         }
     };
-
-    setTimeout(checkLoaded, 0);
 }
 
-function init() {
+function init(shader_source) {
 
     container = document.createElement( 'div' );
     document.body.appendChild( container );
@@ -125,10 +140,10 @@ function init() {
 
     var geometry = new THREE.PlaneBufferGeometry( 2, 2 );
 
-    var material = new THREE.ShaderMaterial( {
-        uniforms: uniformHandler.uniforms,
+    var material = new THREE.ShaderMaterial({
+        uniforms: shader.uniforms,
         vertexShader: $('#vertex-shader').text(),
-        fragmentShader: $('#fragment-shader').text()
+        fragmentShader: shader.source
     });
 
     var mesh = new THREE.Mesh( geometry, material );
@@ -156,7 +171,7 @@ function init() {
 
 function onWindowResize( event ) {
     renderer.setSize( window.innerWidth, window.innerHeight );
-    uniformHandler.update();
+    shader.update();
 }
 
 function animate() {
@@ -175,6 +190,28 @@ var getFrameDuration = (function() {
 })();
 
 function render() {
-    uniformHandler.update();
+    shader.update();
     renderer.render( scene, camera );
+}
+
+// stupid helpers
+function parseQueryString() {
+    var params = {};
+    var qstring = window.location.search.split('?')[1];
+    if (qstring === undefined) return params;
+    var strs = qstring.split('&');
+    for (var i in strs) {
+        var nameAndValue = strs[i].split('=');
+        params[nameAndValue[0]] = decodeURIComponent(nameAndValue[1]);
+    }
+    return params;
+}
+
+function getFolderName(str) {
+    var parts = str.split('/');
+    if (parts.length == 1) return '';
+    parts.pop();
+    var folder = parts.join('/');
+    if (parts.pop() !== '') folder += '/'; // add trailing /
+    return folder;
 }
