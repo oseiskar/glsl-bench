@@ -11,24 +11,28 @@ let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
 const VERTEX_SHADER_SOURCE = $('#vertex-shader').text();
 
 const trivialShaders = {
-  copy: new THREE.ShaderMaterial({
-      uniforms: {
-        scale: {
-          type: 'f',
-          value: 1.0
+  copy: (() => {
+      const m = new THREE.ShaderMaterial({
+        uniforms: {
+          source: {
+            type: 't',
+            value: null
+          },
+          resolution: {
+            type: 'vec2',
+            value: new THREE.Vector2(0,0)
+          }
         },
-        source: {
-          type: 't',
-          value: null
-        },
-        resolution: {
-          type: 'vec2',
-          value: new THREE.Vector2(0,0)
-        }
-      },
-      vertexShader: VERTEX_SHADER_SOURCE,
-      fragmentShader: $('#copy-fragment-shader').text()
-  })
+        vertexShader: VERTEX_SHADER_SOURCE,
+        fragmentShader:
+          $('#raw-fragment-shader-prefix').text() +
+          $('#copy-fragment-shader').text()
+    });
+    // THREE.js prefixes the shaders with a lot of questionable crap
+    // unless this is set
+    m.isRawShaderMaterial = true;
+    return m;
+  })()
 };
 
 function startShader(shader_json_filename) {
@@ -36,6 +40,39 @@ function startShader(shader_json_filename) {
     $.getJSON(shader_json_filename, function(shader_params) {
         shader = new Shader(shader_params, shader_folder);
     });
+}
+
+
+function generateRandom(distribution, size) {
+
+  // TODO: Math.random is of low quality on older browsers
+  // but Xorshift128+ on newer
+
+  // from https://stackoverflow.com/a/36481059/1426569
+  // Standard Normal variate using Box-Muller transform
+  function randnBoxMuller() {
+      var u = 0, v = 0;
+      while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+      while(v === 0) v = Math.random();
+      return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+  }
+
+  const generate = () => {
+    switch (distribution) {
+      case 'uniform':
+        return Math.random();
+      case 'normal':
+        return randnBoxMuller();
+      default:
+        throw new Error('invalid random distribution '+distribution);
+    }
+  }
+
+  const sample = [];
+  for (let i=0; i<size; ++i) {
+    sample.push(generate());
+  }
+  return sample;
 }
 
 function Shader(shader_params, shader_folder) {
@@ -71,6 +108,46 @@ function Shader(shader_params, shader_folder) {
         }
     }
 
+    function buildRandom(val) {
+        // TODO: this encoding is silly
+        const parts = val.split('_');
+        const distribution = parts[1];
+
+        let size = 1;
+        if (parts.length > 2) {
+          size = parts[2];
+          if (parts.length > 3 || size > 4) {
+            throw new Error('invalid random '+val);
+          }
+        }
+
+        let init, updater;
+
+        if (size > 1) {
+          init = {
+            type: 'v' + size,
+            value: new THREE['Vector'+size]()
+          };
+          updater = (v) => {
+            const sample = generateRandom(distribution, size);
+            const letters = 'xyzw';
+            for (let i = 0; i < size; ++i) {
+              v.value[letters[i]] = sample[i];
+            }
+          };
+        } else {
+          init = {
+            type: 'f',
+            value: 0
+          };
+          updater = (v) => {
+            v.value = generateRandom(distribution, 1)[0];
+          };
+        }
+
+        return { declaration: init, updater };
+    }
+
     function buildDynamic(val) {
 
         let init = { type: 'f', value: 0.0 };
@@ -103,6 +180,11 @@ function Shader(shader_params, shader_folder) {
                     v.value.y = mouse_pos.rel_y;
                 };
                 break;
+            case 'frame_number':
+                updater = (v) => {
+                  v.value = frameNumber;
+                };
+                break;
             case 'previous_frame':
                 init = {
                     type: "t",
@@ -114,7 +196,12 @@ function Shader(shader_params, shader_folder) {
                 };
                 break;
             default:
-                throw "invalid uniform mapping " + val;
+                if (val.startsWith('random_')) {
+                  return buildRandom(val);
+                }
+                else {
+                  throw "invalid uniform mapping " + val;
+                }
         }
 
         return { declaration: init, updater: updater };
@@ -190,14 +277,21 @@ function init() {
     const material = new THREE.ShaderMaterial({
         uniforms: shader.uniforms,
         vertexShader: VERTEX_SHADER_SOURCE,
-        fragmentShader: shader.source
+        fragmentShader:
+          $('#raw-fragment-shader-prefix').text() +
+          shader.source
     });
+
+    // THREE.js prefixes the shaders with a lot of questionable crap
+    // unless this is set
+    material.isRawShaderMaterial = true;
 
     mesh = new THREE.Mesh( geometry, material );
     scene.add( mesh );
 
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio( window.devicePixelRatio );
+
     container.appendChild( renderer.domElement );
 
     camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 80000 );
@@ -217,6 +311,8 @@ function init() {
 }
 
 function onWindowResize( event ) {
+    console.log('window size changed');
+
     const sizeX = window.innerWidth;
     const sizeY = window.innerHeight;
     renderer.setSize(sizeX, sizeY);
@@ -240,7 +336,13 @@ function onWindowResize( event ) {
 }
 
 function animate() {
-    requestAnimationFrame( animate );
+    if (shader.params.monte_carlo) {
+      // render as fast as possible
+      setInterval(render, 0);
+    } else {
+      // capped frame rate
+      requestAnimationFrame( animate );
+    }
     render();
 }
 
@@ -272,10 +374,6 @@ function render() {
 
         mesh.material = trivialShaders.copy;
         copyParams.source.value = currentTarget.texture;
-
-        if (shader.params.monte_carlo) {
-          copyParams.scale.value = 1.0 / Math.max(1, frameNumber);
-        }
 
         renderer.render( scene, camera );
         mesh.material = curMaterial;

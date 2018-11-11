@@ -6,6 +6,7 @@
     "uniforms": {
         "resolution": "resolution",
         "base_image": "previous_frame",
+        "frame_number": "frame_number",
         "tent_filter": "random_uniform_2",
         "random_direction_1": "random_normal_3",
         "random_direction_2": "random_normal_3",

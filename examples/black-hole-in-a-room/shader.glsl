@@ -7,6 +7,7 @@ uniform vec2 tent_filter;
 uniform vec3 random_direction_1, random_direction_2, random_direction_3;
 
 uniform sampler2D base_image;
+uniform float frame_number;
 
 #define SQ(x) ((x)*(x))
 #define NO_INTERSECTION vec4(0.0, 0.0, 0.0, -1.0)
@@ -126,8 +127,7 @@ void main() {
 
     vec3 cur_color = vec3(0.0, 0.0, 0.0);
 
-    int bounce;
-    for (bounce = 0; bounce <= N_BOUNCES; ++bounce) {
+    for (int bounce = 0; bounce <= N_BOUNCES; ++bounce) {
 
         // black hole
         float step = 0.01;
@@ -255,5 +255,5 @@ void main() {
     }
 
     vec3 base_color = texture2D(base_image, gl_FragCoord.xy / resolution.xy).xyz;
-    gl_FragColor = vec4(base_color + cur_color, 1.0);
+    gl_FragColor = vec4((base_color * frame_number + cur_color)/(frame_number+1.0), 1.0);
 }

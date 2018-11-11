@@ -5,6 +5,7 @@
 uniform vec2 resolution;
 uniform vec2 tent_filter;
 uniform vec3 random_direction_1, random_direction_2, random_direction_3;
+uniform float frame_number;
 
 uniform sampler2D base_image;
 
@@ -123,8 +124,7 @@ void main() {
 
     vec3 cur_color = vec3(0.0, 0.0, 0.0);
 
-    int bounce;
-    for (bounce = 0; bounce <= N_BOUNCES; ++bounce) {
+    for (int bounce = 0; bounce <= N_BOUNCES; ++bounce)  {
 
         // find intersection
         int which_object = OBJ_NONE;
@@ -204,5 +204,5 @@ void main() {
     }
 
     vec3 base_color = texture2D(base_image, gl_FragCoord.xy / resolution.xy).xyz;
-    gl_FragColor = vec4(base_color + cur_color, 1.0);
+    gl_FragColor = vec4((base_color * frame_number + cur_color)/(frame_number+1.0), 1.0);
 }

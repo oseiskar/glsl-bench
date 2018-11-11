@@ -140,8 +140,6 @@ def main(args):
         # read image data from the framebuffer
         result_image = framebuffer.read()
 
-        if monte_carlo: result_image = result_image / n_samples
-
         if args.numpy_output_file is not None:
             # save raw 32-bit float / HDR channels as a numpy array
             numpy.save(args.numpy_output_file, result_image)
@@ -200,6 +198,8 @@ def main(args):
                         value = get_absolute_mouse()
                     elif source == 'relative_mouse':
                         value = get_rel_mouse()
+                    elif source == 'frame_number':
+                        value = float(n_samples)
                     elif 'random_' in source:
                         value = generate_random(source)
                     else:
@@ -209,13 +209,8 @@ def main(args):
 
                 shader.set_uniforms()
 
-                if monte_carlo:
-                    color_scale = 1.0 / n_samples
-                else:
-                    color_scale = 1.0
-
                 # render
-                texture_rect(aspect, color_scale)
+                texture_rect(aspect)
 
         if n_samples % refresh_every == 0:
             # render from texture 0
