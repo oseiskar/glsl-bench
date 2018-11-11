@@ -347,7 +347,12 @@ function onWindowResize( event ) {
 function animate() {
     if (shader.params.monte_carlo) {
       // render as fast as possible
-      setInterval(render, 0);
+      const renderBatchSize = parseInt(shader.params.batch_size || 1);
+      setInterval(() => {
+        for (let i = 0; i < renderBatchSize; ++i) {
+          render();
+        }
+      }, 0);
     } else {
       // capped frame rate
       requestAnimationFrame( animate );

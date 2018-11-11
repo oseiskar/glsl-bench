@@ -54,11 +54,13 @@
                 if (!params.shader)
                     throw "Please define a shader JSON in the query string";
 
-                const fullscreen = !!params.fullscreen;
                 const runtimeShaderParams = {};
-                if (fullscreen) {
+                if (params.fullscreen) {
                   $('body').toggleClass('fullscreen', true);
                   runtimeShaderParams.resolution = 'auto';
+                }
+                if (params.batch_size) {
+                  runtimeShaderParams.batch_size = parseInt(params.batch_size);
                 }
                 startShader(params.shader, runtimeShaderParams);
             });
