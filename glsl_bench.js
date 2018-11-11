@@ -5,11 +5,11 @@
 
 if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
-var container, scene, camera, renderer, shader;
-var mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
+let container, scene, camera, renderer, shader;
+let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
 
 function startShader(shader_json_filename) {
-    var shader_folder = getFolderName(shader_json_filename);
+    const shader_folder = getFolderName(shader_json_filename);
     $.getJSON(shader_json_filename, function(shader_params) {
         shader = new Shader(shader_params, shader_folder);
     });
@@ -17,29 +17,27 @@ function startShader(shader_json_filename) {
 
 function Shader(shader_params, shader_folder) {
 
-    var that = this;
-
-    var time0 = new Date().getTime();
-    var textures = {};
+    const time0 = new Date().getTime();
+    const textures = {};
     this.source = null;
 
-    function checkLoaded() {
-        for (var key in textures) if (textures[key] === null) return;
-        if (that.source === null) return;
+    const checkLoaded = () => {
+        for (let key in textures) if (textures[key] === null) return;
+        if (this.source === null) return;
         init();
-    }
+    };
 
     $.ajax(shader_folder + shader_params.source_path,
-        { contentType: 'text/plain' }).done(function (shader_source) {
+        { contentType: 'text/plain' }).done((shader_source) => {
             if (shader_params.mustache)
                 shader_source = Mustache.render(shader_source, shader_params.mustache);
-            that.source = shader_source;
+            this.source = shader_source;
             checkLoaded();
         });
 
     function buildFixed(value) {
         if ($.type(value) === "array") {
-            var vec = new THREE['Vector'+value.length](...value);
+            const vec = new THREE['Vector'+value.length](...value);
             return {
                 type: "v"+value.length,
                 value: vec
@@ -51,31 +49,32 @@ function Shader(shader_params, shader_folder) {
 
     function buildDynamic(val) {
 
-        var init = { type: 'f', value: 0.0 }, updater = (function(x) {});
+        let init = { type: 'f', value: 0.0 };
+        let updater = x => {};
 
         switch(val) {
             case 'time':
-                updater = function (v) {
+                updater = (v) => {
                     v.value = (new Date().getTime() - time0) / 1000.0;
                 };
                 break;
             case 'resolution':
                 init = buildFixed([1,1]);
-                updater = function (v) {
+                updater = (v) => {
                     v.value.x = renderer.domElement.width;
                     v.value.y = renderer.domElement.height;
                 };
                 break;
             case 'mouse':
                 init = buildFixed([0,0]);
-                updater = function (v) {
+                updater = (v) => {
                     v.value.x = mouse_pos.x;
                     v.value.y = mouse_pos.y;
                 };
                 break;
             case 'relative_mouse':
                 init = buildFixed([0,0]);
-                updater = function (v) {
+                updater = (v) => {
                     v.value.x = mouse_pos.rel_x;
                     v.value.y = mouse_pos.rel_y;
                 };
@@ -89,14 +88,14 @@ function Shader(shader_params, shader_folder) {
 
     this.uniforms = {};
 
-    var texLoader = new THREE.TextureLoader();
-    function loadTexture(symbol, filename, interpolation) {
+    const texLoader = new THREE.TextureLoader();
+    const loadTexture = (symbol, filename, interpolation) => {
         textures[symbol] = null;
-        texLoader.load(filename, function(tex) {
+        texLoader.load(filename, (tex) => {
             tex.magFilter = interpolation;
             tex.minFilter = interpolation;
             textures[symbol] = tex;
-            that.uniforms[symbol] = {
+            this.uniforms[symbol] = {
                 type: "t",
                 value: tex
             };
@@ -104,14 +103,14 @@ function Shader(shader_params, shader_folder) {
         });
     }
 
-    var bound_uniforms = {};
+    const bound_uniforms = {};
 
-    for (var key in shader_params.uniforms) {
-        var val = shader_params.uniforms[key];
+    for (let key in shader_params.uniforms) {
+        const val = shader_params.uniforms[key];
 
         switch ($.type(val)) {
             case "string":
-                var builder = buildDynamic(val);
+                const builder = buildDynamic(val);
                 bound_uniforms[key] = builder;
                 this.uniforms[key] = builder.declaration;
                 break;
@@ -124,9 +123,9 @@ function Shader(shader_params, shader_folder) {
         }
     }
 
-    this.update = function() {
-        for (var key in bound_uniforms) {
-            bound_uniforms[key].updater(that.uniforms[key]);
+    this.update = () => {
+        for (let key in bound_uniforms) {
+            bound_uniforms[key].updater(this.uniforms[key]);
         }
     };
 }
@@ -138,15 +137,15 @@ function init(shader_source) {
 
     scene = new THREE.Scene();
 
-    var geometry = new THREE.PlaneBufferGeometry( 2, 2 );
+    const geometry = new THREE.PlaneBufferGeometry( 2, 2 );
 
-    var material = new THREE.ShaderMaterial({
+    const material = new THREE.ShaderMaterial({
         uniforms: shader.uniforms,
         vertexShader: $('#vertex-shader').text(),
         fragmentShader: shader.source
     });
 
-    var mesh = new THREE.Mesh( geometry, material );
+    const mesh = new THREE.Mesh( geometry, material );
     scene.add( mesh );
 
     renderer = new THREE.WebGLRenderer();
@@ -158,8 +157,8 @@ function init(shader_source) {
     onWindowResize();
     window.addEventListener( 'resize', onWindowResize, false );
 
-    $(document).mousemove(function(e){
-        var offset = $(container).offset();
+    $(document).mousemove((e) => {
+        const offset = $(container).offset();
         mouse_pos.x = e.pageX - container.offsetLeft;
         mouse_pos.y = e.pageY - container.offsetTop;
         mouse_pos.rel_x = mouse_pos.x / container.offsetWidth;
@@ -179,11 +178,11 @@ function animate() {
     render();
 }
 
-var getFrameDuration = (function() {
-    var lastTimestamp = new Date().getTime();
-    return function() {
-        var timestamp = new Date().getTime();
-        var diff = (timestamp - lastTimestamp) / 1000.0;
+const getFrameDuration = (() => {
+    let lastTimestamp = new Date().getTime();
+    return () => {
+        const timestamp = new Date().getTime();
+        const diff = (timestamp - lastTimestamp) / 1000.0;
         lastTimestamp = timestamp;
         return diff;
     };
@@ -196,22 +195,22 @@ function render() {
 
 // stupid helpers
 function parseQueryString() {
-    var params = {};
-    var qstring = window.location.search.split('?')[1];
+    const params = {};
+    const qstring = window.location.search.split('?')[1];
     if (qstring === undefined) return params;
-    var strs = qstring.split('&');
-    for (var i in strs) {
-        var nameAndValue = strs[i].split('=');
+    const strs = qstring.split('&');
+    for (let i in strs) {
+        const nameAndValue = strs[i].split('=');
         params[nameAndValue[0]] = decodeURIComponent(nameAndValue[1]);
     }
     return params;
 }
 
 function getFolderName(str) {
-    var parts = str.split('/');
+    const parts = str.split('/');
     if (parts.length == 1) return '';
     parts.pop();
-    var folder = parts.join('/');
+    let folder = parts.join('/');
     if (parts.pop() !== '') folder += '/'; // add trailing /
     return folder;
 }
