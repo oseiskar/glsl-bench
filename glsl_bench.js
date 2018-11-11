@@ -35,9 +35,12 @@ const trivialShaders = {
   })()
 };
 
-function startShader(shader_json_filename) {
+function startShader(shader_json_filename, runtime_params) {
     const shader_folder = getFolderName(shader_json_filename);
     $.getJSON(shader_json_filename, function(shader_params) {
+        for (let param in runtime_params) {
+          shader_params[param] = runtime_params[param];
+        }
         shader = new Shader(shader_params, shader_folder);
     });
 }
@@ -294,9 +297,11 @@ function init() {
 
     container.appendChild( renderer.domElement );
 
-    camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 80000 );
-
-    onWindowResize();
+    if (shader.params.resolution === 'auto') {
+      onWindowResize();
+    } else {
+      setSize(shader.params.resolution[0], shader.params.resolution[1]);
+    }
     window.addEventListener( 'resize', onWindowResize, false );
 
     $(document).mousemove((e) => {
@@ -310,12 +315,9 @@ function init() {
     animate();
 }
 
-function onWindowResize( event ) {
-    console.log('window size changed');
-
-    const sizeX = window.innerWidth;
-    const sizeY = window.innerHeight;
+function setSize(sizeX, sizeY) {
     renderer.setSize(sizeX, sizeY);
+    camera = new THREE.PerspectiveCamera( 45, sizeX / sizeY, 1, 80000 );
 
     trivialShaders.copy.uniforms.resolution.value.x = sizeX;
     trivialShaders.copy.uniforms.resolution.value.y = sizeY;
@@ -333,6 +335,13 @@ function onWindowResize( event ) {
     frameNumber = 0;
 
     shader.update();
+}
+
+function onWindowResize( event ) {
+    console.log('window size changed');
+    if (shader.params.resolution === 'auto') {
+      setSize(window.innerWidth, window.innerHeight);
+    }
 }
 
 function animate() {
