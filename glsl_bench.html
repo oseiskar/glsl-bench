@@ -17,6 +17,14 @@
                 gl_Position = vec4( position, 1.0 );
             }
         </script>
+        <script id="copy-fragment-shader" type="x-shader/x-fragment">
+          uniform sampler2D source;
+          uniform float scale;
+          uniform vec2 resolution;
+          void main() {
+            gl_FragColor = texture2D(source, gl_FragCoord.xy / resolution.xy) * scale;
+          }
+        </script>
         <script src="glsl_bench.js"></script>
         <script>
             $(document).ready(function() {

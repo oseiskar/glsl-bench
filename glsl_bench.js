@@ -5,8 +5,31 @@
 
 if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
-let container, scene, camera, renderer, shader;
+let container, scene, camera, mesh, renderer, shader, frameBuffers, frameNumber;
 let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
+
+const VERTEX_SHADER_SOURCE = $('#vertex-shader').text();
+
+const trivialShaders = {
+  copy: new THREE.ShaderMaterial({
+      uniforms: {
+        scale: {
+          type: 'f',
+          value: 1.0
+        },
+        source: {
+          type: 't',
+          value: null
+        },
+        resolution: {
+          type: 'vec2',
+          value: new THREE.Vector2(0,0)
+        }
+      },
+      vertexShader: VERTEX_SHADER_SOURCE,
+      fragmentShader: $('#copy-fragment-shader').text()
+  })
+};
 
 function startShader(shader_json_filename) {
     const shader_folder = getFolderName(shader_json_filename);
@@ -20,6 +43,7 @@ function Shader(shader_params, shader_folder) {
     const time0 = new Date().getTime();
     const textures = {};
     this.source = null;
+    this.params = shader_params;
 
     const checkLoaded = () => {
         for (let key in textures) if (textures[key] === null) return;
@@ -79,6 +103,16 @@ function Shader(shader_params, shader_folder) {
                     v.value.y = mouse_pos.rel_y;
                 };
                 break;
+            case 'previous_frame':
+                init = {
+                    type: "t",
+                    value: null
+                };
+                updater = (v) => {
+                    const curBuffer = frameNumber % 2;
+                    v.value = frameBuffers[1 - curBuffer].texture;
+                };
+                break;
             default:
                 throw "invalid uniform mapping " + val;
         }
@@ -130,7 +164,21 @@ function Shader(shader_params, shader_folder) {
     };
 }
 
-function init(shader_source) {
+function createRenderTarget(sizeX, sizeY) {
+		return new THREE.WebGLRenderTarget(sizeX, sizeY, {
+        wrapS: THREE.ClampToEdgeWrapping,
+        wrapT: THREE.ClampToEdgeWrapping,
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter,
+        format: THREE.RGBAFormat,
+        // iPads/pods/phones don't necessarily support this
+        type: THREE.FloatType,
+        stencilBuffer: false,
+        depthBuffer: false
+    });
+}
+
+function init() {
 
     container = document.createElement( 'div' );
     document.body.appendChild( container );
@@ -141,11 +189,11 @@ function init(shader_source) {
 
     const material = new THREE.ShaderMaterial({
         uniforms: shader.uniforms,
-        vertexShader: $('#vertex-shader').text(),
+        vertexShader: VERTEX_SHADER_SOURCE,
         fragmentShader: shader.source
     });
 
-    const mesh = new THREE.Mesh( geometry, material );
+    mesh = new THREE.Mesh( geometry, material );
     scene.add( mesh );
 
     renderer = new THREE.WebGLRenderer();
@@ -169,7 +217,25 @@ function init(shader_source) {
 }
 
 function onWindowResize( event ) {
-    renderer.setSize( window.innerWidth, window.innerHeight );
+    const sizeX = window.innerWidth;
+    const sizeY = window.innerHeight;
+    renderer.setSize(sizeX, sizeY);
+
+    trivialShaders.copy.uniforms.resolution.value.x = sizeX;
+    trivialShaders.copy.uniforms.resolution.value.y = sizeY;
+
+    if (frameBuffers) frameBuffers.forEach(fb => fb.dispose());
+
+    // TODO rather undescriptive
+    if (shader.params.monte_carlo || shader.params.float_buffers) {
+      // TODO: are these always zero or do they have to be initialized?
+      frameBuffers = [
+        createRenderTarget(sizeX, sizeY),
+        createRenderTarget(sizeX, sizeY)
+      ];
+    }
+    frameNumber = 0;
+
     shader.update();
 }
 
@@ -190,7 +256,33 @@ const getFrameDuration = (() => {
 
 function render() {
     shader.update();
-    renderer.render( scene, camera );
+
+    // TODO: rather undescriptive
+    if (!shader.params.monte_carlo && !shader.params.float_buffers) {
+      // render directly to screen
+      renderer.render( scene, camera );
+    } else {
+      const currentTarget = frameBuffers[frameNumber % 2];
+      renderer.render( scene, camera, currentTarget );
+
+      const refreshEvery = parseInt(shader.params.refresh_every || 1);
+      if (frameNumber % refreshEvery === 0) {
+        const curMaterial = mesh.material;
+        const copyParams = trivialShaders.copy.uniforms;
+
+        mesh.material = trivialShaders.copy;
+        copyParams.source.value = currentTarget.texture;
+
+        if (shader.params.monte_carlo) {
+          copyParams.scale.value = 1.0 / Math.max(1, frameNumber);
+        }
+
+        renderer.render( scene, camera );
+        mesh.material = curMaterial;
+      }
+    }
+
+    frameNumber++;
 }
 
 // stupid helpers
