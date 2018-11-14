@@ -1,4 +1,4 @@
 *.pyc
-out.png
+*.png
 *.npy
 shader.html
