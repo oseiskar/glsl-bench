@@ -12,7 +12,6 @@
         "random_direction_2": "random_normal_3",
         "random_direction_3": "random_normal_3",
         "light_sample": "random_normal_3",
-        "light_selection": "random_uniform_1",
-        "reflection_selection": "random_uniform_1"
+        "random_choice_sample": "random_uniform_1"
     }
 }

@@ -6,7 +6,7 @@ uniform vec2 resolution;
 uniform vec2 tent_filter;
 uniform vec3 random_direction_1, random_direction_2, random_direction_3;
 uniform vec3 light_sample;
-uniform float light_selection, reflection_selection;
+uniform float random_choice_sample;
 uniform float frame_number;
 
 uniform sampler2D base_image;
@@ -108,6 +108,18 @@ vec2 get_ccd_pos(vec2 screen_pos) {
 #define UNIT_SPHERE_AREA (4.0*M_PI)
 #define ZERO_VEC3 vec3(0.0, 0.0, 0.0)
 
+// assuming x is random uniform in [0,1], return x < prob and make
+// x a new random uniform in [0, 1] independent of this choice
+bool random_choice(float prob, in out float x) {
+    if (x < prob) {
+      x /= prob;
+      return true;
+    } else {
+      x = (x - prob) / (1.0 - prob);
+      return false;
+    }
+}
+
 int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, out vec4 intersection) {
     int which_object = OBJ_NONE;
     vec4 cur_isec;
@@ -154,12 +166,12 @@ int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, out vec4 intersec
     return which_object;
 }
 
-int select_light(out vec3 light_point, out float sample_prob_density_per_area) {
+int select_light(out vec3 light_point, out float sample_prob_density_per_area, in out float x) {
       light_point = normalize(light_sample) * light_r;
       sample_prob_density_per_area = 1.0 / (UNIT_SPHERE_AREA*light_r*light_r * float(N_LIGHTS));
 
       int light_object = OBJ_NONE;
-      if (light_selection > 0.5) {
+      if (random_choice(0.5, x)) {
         light_point += light_1_pos;
         light_object = OBJ_LIGHT_1;
       } else {
@@ -232,7 +244,8 @@ void main() {
     vec3 light_point;
     float light_sample_area_probability;
     vec3 light_emission;
-    int light_object = select_light(light_point, light_sample_area_probability);
+    float choice_sample = random_choice_sample;
+    int light_object = select_light(light_point, light_sample_area_probability, choice_sample);
     get_emission(light_object, light_emission);
 
     // ray location on image surface after applying tent filter
@@ -245,7 +258,6 @@ void main() {
 
     vec3 cur_color = ZERO_VEC3;
     bool was_diffuse = false;
-    float ray_type_sample = reflection_selection;
 
     for (int bounce = 0; bounce <= N_BOUNCES; ++bounce)  {
 
@@ -292,17 +304,12 @@ void main() {
 
             float directionCoeff = 0.0;
             float reflectivity = get_reflectivity(which_object);
-            if (ray_type_sample < reflectivity) {
-                ray_type_sample /= reflectivity;
-
+            if (random_choice(reflectivity, choice_sample)) {
                 // full reflection
                 ray = ray - 2.0*dot(normal, ray)*normal;
                 directionCoeff = 1.0;
                 was_diffuse = false;
             } else {
-                ray_type_sample -= reflectivity;
-                ray_type_sample /= 1.0 - reflectivity;
-
                 // diffuse reflection
                 // sample a new direction
                 vec3 rand_dir;
