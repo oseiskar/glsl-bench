@@ -4,9 +4,12 @@
 
 uniform vec2 resolution;
 uniform vec2 tent_filter;
-uniform vec3 random_direction_1, random_direction_2, random_direction_3,
-             random_direction_4, random_direction_5, random_direction_6,
-             random_direction_7, random_direction_8;
+uniform vec4 random_gauss_1, random_gauss_2, random_gauss_3,
+             random_gauss_4, random_gauss_5, random_gauss_6,
+             random_gauss_7, random_gauss_8;
+uniform vec4 random_uniforms_1, random_uniforms_2, random_uniforms_3,
+             random_uniforms_4, random_uniforms_5, random_uniforms_6,
+             random_uniforms_7, random_uniforms_8;
 uniform vec3 light_sample;
 uniform float random_choice_sample;
 uniform float frame_number;
@@ -75,7 +78,7 @@ vec2 get_ccd_pos(vec2 screen_pos) {
 
 // tracer parameters
 #define N_BOUNCES 6
-#define IMAGE_BRIGHTNESS 100.0
+#define IMAGE_BRIGHTNESS 25.0
 
 // secene geometry
 #define OBJ_NONE 0
@@ -204,6 +207,7 @@ bool get_emission(int which_obj, out vec3 emission) {
     emission = ZERO_VEC3;
     return false;
   }
+  emission *= 2.0 / (UNIT_SPHERE_AREA * light_r * light_r);
   return true;
 }
 
@@ -240,22 +244,49 @@ float get_ior(int which_object) {
   return 1.0;
 }
 
-vec3 get_rand_dir(int bounce) {
-  if (bounce == 0) return random_direction_1;
-  if (bounce == 1) return random_direction_2;
-  if (bounce == 2) return random_direction_3;
-  if (bounce == 3) return random_direction_4;
-  if (bounce == 4) return random_direction_5;
-  if (bounce == 5) return random_direction_6;
-  if (bounce == 6) return random_direction_7;
-  if (bounce == 8) return random_direction_8;
-  else return ZERO_VEC3;
+vec4 get_rand_gauss(int bounce) {
+  if (bounce == 0) return random_gauss_1;
+  if (bounce == 1) return random_gauss_2;
+  if (bounce == 2) return random_gauss_3;
+  if (bounce == 3) return random_gauss_4;
+  if (bounce == 4) return random_gauss_5;
+  if (bounce == 5) return random_gauss_6;
+  if (bounce == 6) return random_gauss_7;
+  if (bounce == 8) return random_gauss_8;
+  else return vec4(0.0, 0.0, 0.0, 0.0);
+}
+
+vec4 get_rand_uniforms(int bounce) {
+  if (bounce == 0) return random_uniforms_1;
+  if (bounce == 1) return random_uniforms_2;
+  if (bounce == 2) return random_uniforms_3;
+  if (bounce == 3) return random_uniforms_4;
+  if (bounce == 4) return random_uniforms_5;
+  if (bounce == 5) return random_uniforms_6;
+  if (bounce == 6) return random_uniforms_7;
+  if (bounce == 8) return random_uniforms_8;
+  else return vec4(0.0, 0.0, 0.0, 0.0);
+}
+
+vec3 get_random_cosine_weighted(vec3 normal, int bounce) {
+
+  // uniform sampling
+  //vec3 dir = normalize(get_rand_gauss(bounce).xyz);
+  //if (dot(dir, normal) < 0.0) dir = -dir;
+  //return dir;
+
+  // cosine weighted
+  vec3 dir = get_rand_gauss(bounce).xyz;
+  // project to surface
+  dir = normalize(dir - dot(dir, normal)*normal);
+  float r = get_rand_uniforms(bounce).x;
+  return normal * sqrt(1.0 - r) + dir * sqrt(r);
 }
 
 float weight1(float p1, float p2) {
     //return 0.5;
-    return p1 / (p1 + p2); // balance heuristic
-    //return p1*p1 / (p1*p1 + p2*p2); // power heuristic (2)
+    //return p1 / (p1 + p2); // balance heuristic
+    return p1*p1 / (p1*p1 + p2*p2); // power heuristic (2)
     //return p1 > p2 ? 1.0 : 0.0; // maximum heuristic
 }
 
@@ -299,6 +330,7 @@ void main() {
 
     vec3 cur_color = ZERO_VEC3;
     bool was_diffuse = false;
+    double lastCosineWeight = 0;
 
     for (int bounce = 0; bounce <= N_BOUNCES; ++bounce)  {
 
@@ -317,8 +349,8 @@ void main() {
             vec3 emission = ZERO_VEC3;
             if (get_emission(which_object, emission)) {
                 float invDist2 = 1.0 / (intersection.w*intersection.w);
-                float probThis = 2.0 * invDist2 / UNIT_SPHERE_AREA * -dot(normal, ray);
-                float intensity = 1.0 / (UNIT_SPHERE_AREA * light_r*light_r); // TODO: ?
+                float probThis = 2.0 * invDist2 / UNIT_SPHERE_AREA * -dot(normal, ray) * lastCosineWeight /  M_PI;
+                float intensity = 1.0; // TODO: ?
                 float probOther = light_sample_area_probability;
 
                 if (!was_diffuse) {
@@ -350,17 +382,14 @@ void main() {
                 normal = -normal;
             }
 
-            float directionCoeff = 0.0;
             if (random_choice(get_reflectivity(which_object), choice_sample)) {
                 // full reflection
                 ray = ray - 2.0*dot(normal, ray)*normal;
-                directionCoeff = 1.0;
                 was_diffuse = false;
             } else if (random_choice(get_transparency(which_object), choice_sample)) {
                 // refraction
                 float eta = 1.0 / get_ior(which_object);
 
-                directionCoeff = 1.0;
                 was_diffuse = false;
                 int next_object = which_object;
 
@@ -385,11 +414,8 @@ void main() {
             } else {
                 // diffuse reflection
                 // sample a new direction
-                vec3 rand_dir = get_rand_dir(bounce);
-
-                ray = normalize(rand_dir);
-                if (dot(ray, normal) < 0.0) ray = -ray;
-                directionCoeff = dot(normal, ray);
+                ray = get_random_cosine_weighted(normal, bounce);
+                lastCosineWeight = dot(normal, ray);
 
                 ray_color *= get_diffuse(which_object);
                 was_diffuse = true;
@@ -403,8 +429,8 @@ void main() {
                 // not obstructed
 
                 float invShadowDist2 = 1.0 / (shadow_dist*shadow_dist);
-                float contribTerm =  -dot(shadow_isec.xyz, shadow_ray) * invShadowDist2 * 2.0 / UNIT_SPHERE_AREA;
-                float probOther = contribTerm;
+                float contribTerm =  -dot(shadow_isec.xyz, shadow_ray) * invShadowDist2;
+                float probOther = contribTerm * dot(normal, shadow_ray) / M_PI;
                 float intensity = dot(normal, shadow_ray) * contribTerm;
 
                 // multiple importance sampling probabilities of different strategies
@@ -413,7 +439,9 @@ void main() {
                 cur_color += ray_color * light_emission * intensity * weight2(probThis, probOther);
             }
 
-            ray_color *= directionCoeff;
+            if (was_diffuse) {
+                ray_color *= 1.0 / M_PI;
+            }
             prev_object = which_object;
         }
     }
