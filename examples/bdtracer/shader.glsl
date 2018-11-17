@@ -31,7 +31,7 @@ vec4 sphere_intersection(vec3 pos, vec3 ray, vec3 sphere_pos, float sphere_r, bo
     float sqrt_discr = sqrt(discr);
     float dist = -dotp - sqrt_discr;
     if (is_inside) {
-      dist += sqrt_discr*2;
+      dist += sqrt_discr*2.0;
     }
     dist /= ray2;
     vec3 normal = (pos + ray*dist - sphere_pos) / sphere_r;
@@ -117,7 +117,7 @@ vec2 get_ccd_pos(vec2 screen_pos) {
 
 // assuming x is random uniform in [0,1], return x < prob and make
 // x a new random uniform in [0, 1] independent of this choice
-bool random_choice(float prob, in out float x) {
+bool random_choice(float prob, inout float x) {
     if (x < prob) {
       x /= prob;
       return true;
@@ -179,7 +179,7 @@ int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, int inside_object
     return which_object;
 }
 
-int select_light(out vec3 light_point, out float sample_prob_density_per_area, in out float x) {
+int select_light(out vec3 light_point, out float sample_prob_density_per_area, inout float x) {
       light_point = normalize(light_sample) * light_r;
       sample_prob_density_per_area = 1.0 / (UNIT_SPHERE_AREA*light_r*light_r * float(N_LIGHTS));
 
