@@ -4,7 +4,9 @@
 
 uniform vec2 resolution;
 uniform vec2 tent_filter;
-uniform vec3 random_direction_1, random_direction_2, random_direction_3;
+uniform vec3 random_direction_1, random_direction_2, random_direction_3,
+             random_direction_4, random_direction_5, random_direction_6,
+             random_direction_7, random_direction_8;
 uniform vec3 light_sample;
 uniform float random_choice_sample;
 uniform float frame_number;
@@ -14,7 +16,7 @@ uniform sampler2D base_image;
 #define SQ(x) ((x)*(x))
 #define NO_INTERSECTION vec4(0.0, 0.0, 0.0, -1.0)
 
-vec4 sphere_intersection(vec3 pos, vec3 ray, vec3 sphere_pos, float sphere_r) {
+vec4 sphere_intersection(vec3 pos, vec3 ray, vec3 sphere_pos, float sphere_r, bool is_inside) {
 
     // ray-sphere intersection
     vec3 d = pos - sphere_pos;
@@ -26,7 +28,12 @@ vec4 sphere_intersection(vec3 pos, vec3 ray, vec3 sphere_pos, float sphere_r) {
 
     if (discr < 0.0) return NO_INTERSECTION;
 
-    float dist = (-dotp - sqrt(discr)) / ray2;
+    float sqrt_discr = sqrt(discr);
+    float dist = -dotp - sqrt_discr;
+    if (is_inside) {
+      dist += sqrt_discr*2;
+    }
+    dist /= ray2;
     vec3 normal = (pos + ray*dist - sphere_pos) / sphere_r;
 
     return vec4(normal, dist);
@@ -67,7 +74,7 @@ vec2 get_ccd_pos(vec2 screen_pos) {
 }
 
 // tracer parameters
-#define N_BOUNCES 3
+#define N_BOUNCES 6
 #define IMAGE_BRIGHTNESS 100.0
 
 // secene geometry
@@ -120,43 +127,49 @@ bool random_choice(float prob, in out float x) {
     }
 }
 
-int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, out vec4 intersection) {
+int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, int inside_object, out vec4 intersection) {
     int which_object = OBJ_NONE;
     vec4 cur_isec;
+    bool inside;
 
-    if (prev_object != OBJ_SPHERE_1) {
-        cur_isec = sphere_intersection(ray_pos, ray, sphere_1_pos, sphere_1_r);
+    inside = inside_object == OBJ_SPHERE_1;
+    if (inside || prev_object != OBJ_SPHERE_1) {
+        cur_isec = sphere_intersection(ray_pos, ray, sphere_1_pos, sphere_1_r, inside);
         if (cur_isec.w > 0.0) {
             intersection = cur_isec;
             which_object = OBJ_SPHERE_1;
         }
     }
 
-    if (prev_object != OBJ_SPHERE_2) {
-        cur_isec = sphere_intersection(ray_pos, ray, sphere_2_pos, sphere_2_r);
+    inside = inside_object == OBJ_SPHERE_2;
+    if (inside || prev_object != OBJ_SPHERE_2) {
+        cur_isec = sphere_intersection(ray_pos, ray, sphere_2_pos, sphere_2_r, inside);
         if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
             intersection = cur_isec;
             which_object = OBJ_SPHERE_2;
         }
     }
 
-    // the box interior is non-convex and can handle that
+    // The box interior is non-convex and can handle that.
+    // "Inside" not supported here
     cur_isec = box_interior_intersection(ray_pos, ray, BOX_SIZE, BOX_CENTER);
     if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
         intersection = cur_isec;
         which_object = OBJ_BOX;
     }
 
-    if (prev_object != OBJ_LIGHT_1) {
-        cur_isec = sphere_intersection(ray_pos, ray, light_1_pos, light_r);
+    inside = inside_object == OBJ_LIGHT_1;
+    if (inside || prev_object != OBJ_LIGHT_1) {
+        cur_isec = sphere_intersection(ray_pos, ray, light_1_pos, light_r, inside);
         if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
             intersection = cur_isec;
             which_object = OBJ_LIGHT_1;
         }
     }
 
-    if (prev_object != OBJ_LIGHT_2) {
-        cur_isec = sphere_intersection(ray_pos, ray, light_2_pos, light_r);
+    inside = inside_object == OBJ_LIGHT_2;
+    if (inside || prev_object != OBJ_LIGHT_2) {
+        cur_isec = sphere_intersection(ray_pos, ray, light_2_pos, light_r, inside);
         if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
             intersection = cur_isec;
             which_object = OBJ_LIGHT_2;
@@ -206,10 +219,37 @@ vec3 get_diffuse(int which_object) {
 
 float get_reflectivity(int which_object) {
   if (which_object == OBJ_SPHERE_2) {
-    return 1.0;
+    return 0.1;
   } else {
     return 0.0;
   }
+}
+
+float get_transparency(int which_object) {
+  if (which_object == OBJ_SPHERE_2) {
+    return 1.0; // sampled after reflectivity
+  }
+  return 0.0;
+}
+
+// index of refraction
+float get_ior(int which_object) {
+  if (which_object == OBJ_SPHERE_2) {
+    return 1.5;
+  }
+  return 1.0;
+}
+
+vec3 get_rand_dir(int bounce) {
+  if (bounce == 0) return random_direction_1;
+  if (bounce == 1) return random_direction_2;
+  if (bounce == 2) return random_direction_3;
+  if (bounce == 3) return random_direction_4;
+  if (bounce == 4) return random_direction_5;
+  if (bounce == 5) return random_direction_6;
+  if (bounce == 6) return random_direction_7;
+  if (bounce == 8) return random_direction_8;
+  else return ZERO_VEC3;
 }
 
 float weight1(float p1, float p2) {
@@ -255,6 +295,7 @@ void main() {
 
     vec3 ray_color = vec3(1.0, 1.0, 1.0) * IMAGE_BRIGHTNESS;
     int prev_object = OBJ_NONE;
+    int inside_object = OBJ_NONE;
 
     vec3 cur_color = ZERO_VEC3;
     bool was_diffuse = false;
@@ -264,7 +305,7 @@ void main() {
         // find intersection
         vec4 intersection; // vec4(normal.xyz, distance)
 
-        int which_object = find_intersection(ray_pos, ray, prev_object, intersection);
+        int which_object = find_intersection(ray_pos, ray, prev_object, inside_object, intersection);
 
         if (which_object == OBJ_NONE) {
             ray_color = ZERO_VEC3;
@@ -277,6 +318,7 @@ void main() {
             if (get_emission(which_object, emission)) {
                 float invDist2 = 1.0 / (intersection.w*intersection.w);
                 float probThis = 2.0 * invDist2 / UNIT_SPHERE_AREA * -dot(normal, ray);
+                float intensity = 1.0 / (UNIT_SPHERE_AREA * light_r*light_r); // TODO: ?
                 float probOther = light_sample_area_probability;
 
                 if (!was_diffuse) {
@@ -284,7 +326,7 @@ void main() {
                     probThis = 1.0;
                 }
 
-                cur_color += ray_color * emission * weight1(probThis, probOther);
+                cur_color += intensity * ray_color * emission * weight1(probThis, probOther);
             }
 
             // visibility test
@@ -294,28 +336,56 @@ void main() {
             shadow_ray = normalize(shadow_ray);
 
             int shadow_object = which_object;
-            if (which_object != light_object && dot(shadow_ray, normal) > 0.0) {
-                shadow_object = find_intersection(ray_pos, shadow_ray, which_object, shadow_isec);
+            if (which_object != light_object &&
+                inside_object == OBJ_NONE && // no lights inside transparent objects supported
+                dot(shadow_ray, normal) > 0.0) {
+                shadow_object = find_intersection(ray_pos, shadow_ray, which_object, inside_object, shadow_isec);
             }
             else {
               shadow_isec.w = -1.0;
               shadow_object = N_OBJECTS;
             }
 
+            if (which_object == inside_object) {
+                normal = -normal;
+            }
+
             float directionCoeff = 0.0;
-            float reflectivity = get_reflectivity(which_object);
-            if (random_choice(reflectivity, choice_sample)) {
+            if (random_choice(get_reflectivity(which_object), choice_sample)) {
                 // full reflection
                 ray = ray - 2.0*dot(normal, ray)*normal;
                 directionCoeff = 1.0;
                 was_diffuse = false;
+            } else if (random_choice(get_transparency(which_object), choice_sample)) {
+                // refraction
+                float eta = 1.0 / get_ior(which_object);
+
+                directionCoeff = 1.0;
+                was_diffuse = false;
+                int next_object = which_object;
+
+                // out
+                if (inside_object == which_object) {
+                    next_object = OBJ_NONE;
+                    eta = 1.0 / eta;
+                }
+
+                // see https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/refract.xhtml
+                // Snell's law for refraction
+                float d = dot(normal, ray);
+                float k = 1.0 - eta*eta * (1.0 - d*d);
+                if (k < 0.0) {
+                    // total reflection
+                    ray = ray - 2.0*d*normal;
+                } else {
+                    inside_object = next_object;
+                    ray = eta * ray - (eta * d + sqrt(k)) * normal;
+                    normal = -normal;
+                }
             } else {
                 // diffuse reflection
                 // sample a new direction
-                vec3 rand_dir;
-                if (bounce == 0) rand_dir = random_direction_1;
-                if (bounce == 1) rand_dir = random_direction_2;
-                else rand_dir = random_direction_3;
+                vec3 rand_dir = get_rand_dir(bounce);
 
                 ray = normalize(rand_dir);
                 if (dot(ray, normal) < 0.0) ray = -ray;

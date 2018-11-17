@@ -11,6 +11,11 @@
         "random_direction_1": "random_normal_3",
         "random_direction_2": "random_normal_3",
         "random_direction_3": "random_normal_3",
+        "random_direction_4": "random_normal_3",
+        "random_direction_5": "random_normal_3",
+        "random_direction_6": "random_normal_3",
+        "random_direction_7": "random_normal_3",
+        "random_direction_8": "random_normal_3",
         "light_sample": "random_normal_3",
         "random_choice_sample": "random_uniform_1"
     }
