@@ -76,10 +76,6 @@ vec2 get_ccd_pos(vec2 screen_pos) {
     return ((jittered_pos / resolution.xy) * 2.0 - 1.0) * vec2(1.0, aspect);
 }
 
-// tracer parameters
-#define N_BOUNCES 4
-#define IMAGE_BRIGHTNESS 1.0
-
 // secene geometry
 #define OBJ_NONE 0
 #define OBJ_SPHERE_1 1
@@ -108,11 +104,11 @@ vec2 get_ccd_pos(vec2 screen_pos) {
 #define light_2_pos vec3(0.0, ROOM_W*0.5, ROOM_H)
 
 // materials
-#define light_1_emission vec3(0.8, 0.8, 1.0)*200.0;
-#define light_2_emission vec3(1.0, 0.8, 0.6)*200.0;
+#define light_1_emission vec3(0.8, 0.8, 1.0)*100.0;
+#define light_2_emission vec3(1.0, 0.8, 0.6)*100.0;
 
-#define sphere_1_diffuse vec3(.5, .8, .9)
-#define box_diffuse vec3(1., 1., 1.)*.7
+#define sphere_1_diffuse vec3(.5, .8, .9) * 0.5
+#define box_diffuse vec3(1., 1., 1.)*.7 * 0.5
 
 // helpers
 #define UNIT_SPHERE_AREA (4.0*M_PI)
@@ -284,6 +280,10 @@ vec3 get_random_cosine_weighted(vec3 normal, int bounce) {
   return normal * sqrt(1.0 - r) + dir * sqrt(r);
 }
 
+// tracer parameters
+#define N_BOUNCES 4
+#define IMAGE_BRIGHTNESS 1.0
+
 #if 1
 float weight1(float p1, float p2) {
     //return 0.5;
@@ -293,10 +293,14 @@ float weight1(float p1, float p2) {
 }
 
 #define weight2 weight1
-#else
+#elif 0
 // uncomment to use pure path tracing
 #define weight1(a,b) 1.0
 #define weight2(a,b) 0.0
+#else
+// uncomment to use only direct lights (if bounces == 1)
+#define weight1(a,b) 0.0
+#define weight2(a,b) 1.0
 #endif
 
 void main() {
@@ -352,7 +356,6 @@ void main() {
             if (get_emission(which_object, emission)) {
                 float changeOfVarsTerm = -dot(normal, ray) / (intersection.w*intersection.w);
                 float probThis = changeOfVarsTerm * lastCosineWeight /  M_PI;
-                float intensity = 1.0; //M_PI; //1.0; // TODO: ?
                 float probOther = light_sample_area_probability;
 
                 if (!was_diffuse) {
@@ -360,7 +363,7 @@ void main() {
                     probThis = 1.0;
                 }
 
-                cur_color += intensity * ray_color * emission * weight1(probThis, probOther);
+                cur_color += ray_color * emission * weight1(probThis, probOther);
             }
 
             // visibility test
@@ -435,11 +438,16 @@ void main() {
 
                 // multiple importance sampling probabilities of different strategies
                 float probThis = light_sample_area_probability;
-                float intensity = dot(normal, shadow_ray) * changeOfVarsTerm / probThis / M_PI; // mystery PI
+                float intensity = dot(normal, shadow_ray) * changeOfVarsTerm / probThis;
 
                 cur_color += ray_color * light_emission * intensity * weight2(probThis, probOther);
             }
 
+            if (was_diffuse) {
+                // PI comes from the contribution
+                // f(x) / p(x) = cos(w) / (cos(w) / PI) = PI
+                ray_color *= M_PI;
+            }
             prev_object = which_object;
         }
     }
