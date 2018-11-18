@@ -108,8 +108,8 @@ vec2 get_ccd_pos(vec2 screen_pos) {
 #define light_2_pos vec3(0.0, ROOM_W*0.5, ROOM_H)
 
 // materials
-#define light_1_emission vec3(0.8, 0.8, 1.0)*100.0;
-#define light_2_emission vec3(1.0, 0.8, 0.6)*100.0;
+#define light_1_emission vec3(0.8, 0.8, 1.0)*200.0;
+#define light_2_emission vec3(1.0, 0.8, 0.6)*200.0;
 
 #define sphere_1_diffuse vec3(.5, .8, .9)
 #define box_diffuse vec3(1., 1., 1.)*.7
@@ -320,7 +320,6 @@ void main() {
     float choice_sample = random_choice_sample;
     int light_object = select_light(light_point, light_sample_area_probability, choice_sample);
     get_emission(light_object, light_emission);
-    light_emission *= N_LIGHTS;
 
     // ray location on image surface after applying tent filter
     vec2 ccd_pos = get_ccd_pos(gl_FragCoord.xy);
@@ -352,7 +351,7 @@ void main() {
             if (get_emission(which_object, emission)) {
                 float changeOfVarsTerm = -dot(normal, ray) / (intersection.w*intersection.w);
                 float probThis = changeOfVarsTerm * lastCosineWeight /  M_PI;
-                float intensity = 1.0; // TODO: ?
+                float intensity = 1.0; //M_PI; //1.0; // TODO: ?
                 float probOther = light_sample_area_probability;
 
                 if (!was_diffuse) {
@@ -430,13 +429,12 @@ void main() {
 
                 // not obstructed
 
-                float invShadowDist2 = 1.0 / (shadow_dist*shadow_dist);
-                float changeOfVarsTerm = -dot(shadow_isec.xyz, shadow_ray) * invShadowDist2;
+                float changeOfVarsTerm = -dot(shadow_isec.xyz, shadow_ray) / (shadow_dist*shadow_dist);
                 float probOther = changeOfVarsTerm * dot(normal, shadow_ray) / M_PI;
 
                 // multiple importance sampling probabilities of different strategies
                 float probThis = light_sample_area_probability;
-                float intensity = dot(normal, shadow_ray) * changeOfVarsTerm / M_PI; // mystery M_PI
+                float intensity = dot(normal, shadow_ray) * changeOfVarsTerm / probThis / (2.0 * M_PI); // mystery 2*PI
 
                 cur_color += ray_color * light_emission * intensity * weight2(probThis, probOther);
             }
