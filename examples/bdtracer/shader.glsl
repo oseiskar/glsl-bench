@@ -182,8 +182,9 @@ int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, int inside_object
     return which_object;
 }
 
-int select_light(out vec3 light_point, out float sample_prob_density_per_area, inout float x) {
-      light_point = normalize(light_sample) * light_r;
+int select_light(out vec3 light_point, out vec3 light_normal, out float sample_prob_density_per_area, inout float x) {
+      light_normal = normalize(light_sample);
+      light_point = light_normal * light_r;
       sample_prob_density_per_area = 1.0 / (UNIT_SPHERE_AREA*light_r*light_r * float(N_LIGHTS));
 
       int light_object = OBJ_NONE;
@@ -314,11 +315,11 @@ void main() {
     cam_y = cross(cam_x, cam_z);
     cam_pos = -cam_z * cam_dist + camera_target;
 
-    vec3 light_point;
+    vec3 light_point, light_normal;
     float light_sample_area_probability;
     vec3 light_emission;
     float choice_sample = random_choice_sample;
-    int light_object = select_light(light_point, light_sample_area_probability, choice_sample);
+    int light_object = select_light(light_point, light_normal, light_sample_area_probability, choice_sample);
     get_emission(light_object, light_emission);
 
     // ray location on image surface after applying tent filter
@@ -371,7 +372,8 @@ void main() {
             int shadow_object = which_object;
             if (which_object != light_object &&
                 inside_object == OBJ_NONE && // no lights inside transparent objects supported
-                dot(shadow_ray, normal) > 0.0) {
+                dot(shadow_ray, normal) > 0.0 &&
+                dot(shadow_ray, light_normal) < 0.0) {
                 shadow_object = find_intersection(ray_pos, shadow_ray, which_object, inside_object, shadow_isec);
             }
             else {
@@ -433,7 +435,7 @@ void main() {
 
                 // multiple importance sampling probabilities of different strategies
                 float probThis = light_sample_area_probability;
-                float intensity = dot(normal, shadow_ray) * changeOfVarsTerm / probThis / (2.0 * M_PI); // mystery 2*PI
+                float intensity = dot(normal, shadow_ray) * changeOfVarsTerm / probThis / M_PI; // mystery PI
 
                 cur_color += ray_color * light_emission * intensity * weight2(probThis, probOther);
             }
