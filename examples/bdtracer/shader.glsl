@@ -424,8 +424,7 @@ void main() {
 
             if (bounce < N_BOUNCES && was_diffuse && (
                   shadow_object == OBJ_NONE ||
-                  (shadow_object == light_object && dot(shadow_isec.xyz, shadow_ray) < 0.0) ||
-                  shadow_isec.w > shadow_dist)) {
+                  shadow_object == light_object)) {
 
                 // not obstructed
 
