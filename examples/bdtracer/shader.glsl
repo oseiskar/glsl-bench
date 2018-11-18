@@ -337,7 +337,7 @@ void main() {
 
     vec3 cur_color = ZERO_VEC3;
     bool was_diffuse = false;
-    double lastCosineWeight = 0;
+    float lastCosineWeight = 0.0;
 
     for (int bounce = 0; bounce <= N_BOUNCES; ++bounce)  {
 
