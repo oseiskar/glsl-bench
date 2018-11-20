@@ -48,22 +48,38 @@
           precision highp int;
         </script>
         <script src="glsl_bench.js"></script>
+        <script src="js_tracer_framework/dynamic_tracers.js"></script>
         <script>
-            $(document).ready(function() {
-                var params = parseQueryString();
-                if (!params.shader)
-                    throw "Please define a shader JSON in the query string";
+          $(document).ready(function() {
+            let shaderFolder = '/';
+            const params = parseQueryString();
 
-                const runtimeShaderParams = {};
-                if (params.fullscreen) {
-                  $('body').toggleClass('fullscreen', true);
-                  runtimeShaderParams.resolution = 'auto';
-                }
-                if (params.batch_size) {
-                  runtimeShaderParams.batch_size = parseInt(params.batch_size);
-                }
-                startShader(params.shader, runtimeShaderParams);
-            });
+            const runtimeShaderParams = {};
+            if (params.fullscreen) {
+              $('body').toggleClass('fullscreen', true);
+              runtimeShaderParams.resolution = 'auto';
+            }
+            if (params.batch_size) {
+              runtimeShaderParams.batch_size = parseInt(params.batch_size);
+            }
+
+            function doStart(shaderSpec) {
+              for (let param in runtimeShaderParams) {
+                shaderSpec[param] = runtimeShaderParams[param];
+              }
+              startShader(shaderSpec, shaderFolder);
+            }
+
+            if (params.dynamicTracer) {
+              doStart(dynamicTracers[params.dynamicTracer]);
+            } else if (params.shader) {
+              shaderFolder = getFolderName(params.shader);
+              $.getJSON(params.shader, doStart);
+            }
+            else {
+              throw "Please define a shader JSON in the query string";
+            }
+          });
         </script>
     </body>
 </html>

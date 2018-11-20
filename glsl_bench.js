@@ -35,16 +35,9 @@ const trivialShaders = {
   })()
 };
 
-function startShader(shader_json_filename, runtime_params) {
-    const shader_folder = getFolderName(shader_json_filename);
-    $.getJSON(shader_json_filename, function(shader_params) {
-        for (let param in runtime_params) {
-          shader_params[param] = runtime_params[param];
-        }
-        shader = new Shader(shader_params, shader_folder);
-    });
+function startShader(shader_params, shader_folder) {
+  shader = new Shader(shader_params, shader_folder);
 }
-
 
 function generateRandom(distribution, size) {
 
@@ -91,13 +84,23 @@ function Shader(shader_params, shader_folder) {
         init();
     };
 
-    $.ajax(shader_folder + shader_params.source_path,
-        { contentType: 'text/plain' }).done((shader_source) => {
-            if (shader_params.mustache)
-                shader_source = Mustache.render(shader_source, shader_params.mustache);
-            this.source = shader_source;
-            checkLoaded();
-        });
+    const doStart = (shader_source) => {
+        if (shader_params.mustache)
+            shader_source = Mustache.render(shader_source, shader_params.mustache);
+        this.source = shader_source;
+        checkLoaded();
+    };
+
+    if (shader_params.source) {
+        doStart(shader_params.source);
+    } else if (shader_params.source_path) {
+        $.ajax(shader_folder + shader_params.source_path,
+            { contentType: 'text/plain' })
+            .done(doStart)
+            .error((x, status, err) => { throw err; });
+    } else {
+        throw new Error('No shader source code defined');
+    }
 
     function buildFixed(value) {
         if ($.type(value) === "array") {
