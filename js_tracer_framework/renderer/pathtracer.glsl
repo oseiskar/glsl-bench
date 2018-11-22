@@ -1,3 +1,4 @@
+#include "parameters"
 #include "scene"
 #include "rand"
 #include "camera"
@@ -23,6 +24,10 @@ vec3 get_random_cosine_weighted(vec3 normal, inout rand_state rng) {
     return normal * sqrt(1.0 - r) + dir * sqrt(r);
 }
 
+#ifndef N_BOUNCES
+#define N_BOUNCES 4
+#endif
+
 vec3 render(vec2 xy, vec2 resolution) {
 
     rand_state rng;
@@ -37,8 +42,6 @@ vec3 render(vec2 xy, vec2 resolution) {
     int prev_object = 0; // assumed to be OBJ_NONE
     int inside_object = 0;
     vec3 cur_color = zero_vec3;
-
-    const int N_BOUNCES = 4;
 
     float choice_sample = rand_next_uniform(rng);
 

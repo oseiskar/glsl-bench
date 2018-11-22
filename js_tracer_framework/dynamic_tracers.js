@@ -75,7 +75,11 @@ const dynamicTracers = {
       'scene': 'scene/test.glsl',
       'camera': 'camera/pinhole.glsl',
       'rand': 'rand/fixed_vecs.glsl'
-    }, TRACER_DATA),
+    }, Object.assign({
+      'parameters': [
+        '#define N_BOUNCES 4'
+      ].join('\n')
+    }, TRACER_DATA)),
     "monte_carlo": true,
     "refresh_every": 20,
     "uniforms": {
