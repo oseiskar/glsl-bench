@@ -11,28 +11,22 @@ let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
 const VERTEX_SHADER_SOURCE = $('#vertex-shader').text();
 
 const trivialShaders = {
-  copy: (() => {
-      const m = new THREE.ShaderMaterial({
-        uniforms: {
-          source: {
-            type: 't',
-            value: null
-          },
-          resolution: {
-            type: 'vec2',
-            value: new THREE.Vector2(0,0)
-          }
+  copy: new THREE.RawShaderMaterial({
+      uniforms: {
+        source: {
+          type: 't',
+          value: null
         },
-        vertexShader: VERTEX_SHADER_SOURCE,
-        fragmentShader:
-          $('#raw-fragment-shader-prefix').text() +
-          $('#copy-fragment-shader').text()
-    });
-    // THREE.js prefixes the shaders with a lot of questionable crap
-    // unless this is set
-    m.isRawShaderMaterial = true;
-    return m;
-  })()
+        resolution: {
+          type: 'vec2',
+          value: new THREE.Vector2(0,0)
+        }
+      },
+      vertexShader: VERTEX_SHADER_SOURCE,
+      fragmentShader:
+        $('#raw-fragment-shader-prefix').text() +
+        $('#copy-fragment-shader').text()
+  })
 };
 
 function startShader(shader_params, shader_folder) {
@@ -85,6 +79,7 @@ function Shader(shader_params, shader_folder) {
     };
 
     const doStart = (shader_source) => {
+        //console.log(shader_source);
         if (shader_params.mustache)
             shader_source = Mustache.render(shader_source, shader_params.mustache);
         this.source = shader_source;
@@ -92,7 +87,7 @@ function Shader(shader_params, shader_folder) {
     };
 
     if (shader_params.source) {
-        doStart(shader_params.source);
+        setTimeout(() => doStart(shader_params.source), 0);
     } else if (shader_params.source_path) {
         $.ajax(shader_folder + shader_params.source_path,
             { contentType: 'text/plain' })
@@ -280,7 +275,7 @@ function init() {
 
     const geometry = new THREE.PlaneBufferGeometry( 2, 2 );
 
-    const material = new THREE.ShaderMaterial({
+    shader.material = new THREE.RawShaderMaterial({
         uniforms: shader.uniforms,
         vertexShader: VERTEX_SHADER_SOURCE,
         fragmentShader:
@@ -288,11 +283,7 @@ function init() {
           shader.source
     });
 
-    // THREE.js prefixes the shaders with a lot of questionable crap
-    // unless this is set
-    material.isRawShaderMaterial = true;
-
-    mesh = new THREE.Mesh( geometry, material );
+    mesh = new THREE.Mesh( geometry, shader.material );
     scene.add( mesh );
 
     renderer = new THREE.WebGLRenderer();
@@ -351,14 +342,16 @@ function animate() {
     if (shader.params.monte_carlo) {
       // render as fast as possible
       const renderBatchSize = parseInt(shader.params.batch_size || 1);
-      setInterval(() => {
+      const timer = setInterval(() => {
         for (let i = 0; i < renderBatchSize; ++i) {
           render();
         }
       }, 0);
+      shader.stop = () => clearInterval(timer);
     } else {
       // capped frame rate
-      requestAnimationFrame( animate );
+      const timer = requestAnimationFrame( animate );
+      shader.stop = () => cancelAnimationFrame(timer);
     }
     render();
 }
@@ -373,16 +366,44 @@ const getFrameDuration = (() => {
     };
 })();
 
+function parseShaderError(diagnostics, code) {
+    const msg = diagnostics.fragmentShader.log;
+    const match = /ERROR:\s*\d+:(\d+)/.exec(msg);
+    const errorLineNo = match && match[1];
+    if (errorLineNo) {
+      const lines = code.split('\n');
+      const i = parseInt(errorLineNo)-1;
+      const msg = [i-1, i, i+1].map(j => ({ lineNo: j+1, line: lines[j]}))
+        .filter(x => x.line)
+        .map(x => `${x.lineNo}: ${x.line}`)
+        .join('\n');
+
+      return '\n' + msg;
+    }
+
+    return `Could not interpret error: ${msg} (${JSON.stringify(diagnostics)})`;
+}
+
 function render() {
     shader.update();
+
+    function tryRender(f) {
+      f();
+      if (shader.material.program.diagnostics) {
+        console.log();
+        shader.stop();
+        throw new Error(parseShaderError(shader.material.program.diagnostics, shader.material.program.code));
+      }
+    }
 
     // TODO: rather undescriptive
     if (!shader.params.monte_carlo && !shader.params.float_buffers) {
       // render directly to screen
-      renderer.render( scene, camera );
+      tryRender(() => { renderer.render( scene, camera ); });
+      ;
     } else {
       const currentTarget = frameBuffers[frameNumber % 2];
-      renderer.render( scene, camera, currentTarget );
+      tryRender(() => { renderer.render( scene, camera, currentTarget ); });
 
       const refreshEvery = parseInt(shader.params.refresh_every || 1);
       if (frameNumber % refreshEvery === 0) {

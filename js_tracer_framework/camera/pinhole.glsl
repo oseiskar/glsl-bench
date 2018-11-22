@@ -1,8 +1,6 @@
 #include "rand"
 #include "scene"
-
-#define M_PI 3.14159265358979323846
-#define DEG2RAD(x) ((x)/180.0*M_PI)
+#include "util/math.glsl"
 
 float tent_filter_transformation(float x) {
     x *= 2.0;
@@ -18,7 +16,7 @@ vec2 get_ccd_pos(vec2 screen_pos, vec2 resolution, inout rand_state rng) {
     return ((jittered_pos / resolution.xy) * 2.0 - 1.0) * vec2(1.0, aspect);
 }
 
-void get_camera_ray(vec2 screen_pos, vec2 resolution, out vec3 ray, out vec3 ray_pos, inout rand_state rng) {
+void get_camera_ray(vec2 screen_pos, vec2 resolution, out vec3 ray_pos, out vec3 ray, inout rand_state rng) {
     vec3 cam_pos, cam_x, cam_y, cam_z;
     float fov_angle;
 

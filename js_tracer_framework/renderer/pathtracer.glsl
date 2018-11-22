@@ -1,5 +1,6 @@
 #include "scene"
 #include "rand"
+#include "camera"
 
 // assuming x is random uniform in [0,1], return x < prob and make
 // x a new random uniform in [0, 1] independent of this choice
@@ -19,22 +20,23 @@ vec3 get_random_cosine_weighted(vec3 normal, inout rand_state rng) {
     // project to surface
     dir = normalize(dir - dot(dir, normal)*normal);
     float r = rand_next_uniform(rng);
-    return normal * sqrt(1.0 - r) + dir * sqrt(r);rand_state
+    return normal * sqrt(1.0 - r) + dir * sqrt(r);
 }
 
-vec3 trace(vec2 xy, vec2 resolution) {
+vec3 render(vec2 xy, vec2 resolution) {
+
     rand_state rng;
     rand_init(rng);
 
-    vec3 ray_pos, ray;
+    vec3 ray_pos;
+    vec3 ray;
     get_camera_ray(xy, resolution, ray_pos, ray, rng);
     vec3 ray_color = vec3(1.0, 1.0, 1.0);
 
-    const int OBJ_NONE = 0;
-    const vec3 ZERO_VEC3 = vec3(0.0, 0.0, 0.0);
-    int prev_object = OBJ_NONE;
-    int inside_object = OBJ_NONE;
-    vec3 cur_color = ZERO_VEC3;
+    const vec3 zero_vec3 = vec3(0.0, 0.0, 0.0);
+    int prev_object = 0; // assumed to be OBJ_NONE
+    int inside_object = 0;
+    vec3 cur_color = zero_vec3;
 
     const int N_BOUNCES = 4;
 
@@ -44,13 +46,14 @@ vec3 trace(vec2 xy, vec2 resolution) {
         // find intersection
         vec4 intersection; // vec4(normal.xyz, distance)
         int which_object = find_intersection(ray_pos, ray, prev_object, inside_object, intersection);
-        if (which_object == OBJ_NONE) {
-            ray_color = ZERO_VEC3;
+
+        if (which_object == 0) {
+            ray_color = zero_vec3;
         } else {
             vec3 normal = intersection.xyz;
             ray_pos += intersection.w * ray;
 
-            vec3 emission = ZERO_VEC3;
+            vec3 emission = zero_vec3;
             if (get_emission(which_object, emission)) {
                 cur_color += ray_color * emission;
             }
@@ -70,7 +73,7 @@ vec3 trace(vec2 xy, vec2 resolution) {
 
                 // out
                 if (inside_object == which_object) {
-                    next_object = OBJ_NONE;
+                    next_object = 0;
                     eta = 1.0 / eta;
                 }
 
@@ -89,7 +92,7 @@ vec3 trace(vec2 xy, vec2 resolution) {
             } else {
                 // diffuse reflection
                 // sample a new direction
-                ray = get_random_cosine_weighted(normal, bounce);
+                ray = get_random_cosine_weighted(normal, rng);
                 ray_color *= get_diffuse(which_object);
             }
             prev_object = which_object;

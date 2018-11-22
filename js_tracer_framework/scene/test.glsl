@@ -1,4 +1,6 @@
-#include "surfaces/sphere"
+#include "surfaces/sphere.glsl"
+#include "surfaces/box_interior.glsl"
+#include "util/math.glsl"
 
 // secene geometry
 #define OBJ_NONE 0
@@ -47,7 +49,7 @@ int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, int inside_object
     inside = inside_object == OBJ_SPHERE_1;
     if (inside || prev_object != OBJ_SPHERE_1) {
         rel_pos = ray_pos - sphere_1_pos;
-        cur_isec = sphere_intersection(ray_pos, ray, inside, sphere_1_r);
+        cur_isec = sphere_intersection(rel_pos, ray, inside, sphere_1_r);
         if (cur_isec.w > 0.0) {
             intersection = cur_isec;
             which_object = OBJ_SPHERE_1;
@@ -57,7 +59,7 @@ int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, int inside_object
     inside = inside_object == OBJ_SPHERE_2;
     if (inside || prev_object != OBJ_SPHERE_2) {
         rel_pos = ray_pos - sphere_2_pos;
-        cur_isec = sphere_intersection(ray_pos, ray, inside, sphere_2_r);
+        cur_isec = sphere_intersection(rel_pos, ray, inside, sphere_2_r);
         if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
             intersection = cur_isec;
             which_object = OBJ_SPHERE_2;
@@ -66,16 +68,17 @@ int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, int inside_object
 
     // The box interior is non-convex and can handle that.
     // "Inside" not supported here
-    /*cur_isec = box_interior_intersection(ray_pos, ray, BOX_SIZE, BOX_CENTER);
+    rel_pos = ray_pos - BOX_CENTER;
+    cur_isec = box_interior_intersection(rel_pos, ray, BOX_SIZE);
     if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
         intersection = cur_isec;
         which_object = OBJ_BOX;
-    }*/
+    }
 
     inside = inside_object == OBJ_LIGHT_1;
     if (inside || prev_object != OBJ_LIGHT_1) {
         rel_pos = ray_pos - light_1_pos;
-        cur_isec = sphere_intersection(ray_pos, ray, inside, light_r);
+        cur_isec = sphere_intersection(rel_pos, ray, inside, light_r);
         if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
             intersection = cur_isec;
             which_object = OBJ_LIGHT_1;
@@ -85,7 +88,7 @@ int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, int inside_object
     inside = inside_object == OBJ_LIGHT_2;
     if (inside || prev_object != OBJ_LIGHT_2) {
         rel_pos = ray_pos - light_2_pos;
-        cur_isec = sphere_intersection(ray_pos, ray, inside, light_r);
+        cur_isec = sphere_intersection(rel_pos, ray, inside, light_r);
         if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
             intersection = cur_isec;
             which_object = OBJ_LIGHT_2;

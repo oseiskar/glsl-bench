@@ -22,7 +22,7 @@ vec4 sphere_intersection(vec3 pos, vec3 ray, bool is_inside, float sphere_r) {
       dist += sqrt_discr*2.0;
     }
     dist /= ray2;
-    vec3 normal = (pos + ray*dist - sphere_pos) / sphere_r;
+    vec3 normal = (d + ray*dist) / sphere_r;
 
     return vec4(normal, dist);
 }

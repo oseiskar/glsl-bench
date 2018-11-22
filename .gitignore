@@ -2,3 +2,5 @@
 *.png
 *.npy
 shader.html
+outputs/
+build/

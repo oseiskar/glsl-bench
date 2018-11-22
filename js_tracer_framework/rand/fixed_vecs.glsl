@@ -11,51 +11,47 @@ struct rand_state {
     int index_gauss4;
 };
 
-void rand_init(out rand_state_shared_uniforms state) {
+void rand_init(out rand_state state) {
     state.index_uniform = 0;
     state.index_gauss4 = 0;
 }
 
-vec3 rand_next_gauss4(inout rand_state_shared_uniforms state) {
+vec4 rand_next_gauss4(inout rand_state state) {
     state.index_gauss4++;
-    switch(state.index_gauss4) {
-      case 1: return random_gauss_1;
-      case 2: return random_gauss_2;
-      case 3: return random_gauss_3;
-      case 4: return random_gauss_4;
-      case 5: return random_gauss_5;
-      case 6: return random_gauss_6;
-      case 7: return random_gauss_7;
-      case 8: return random_gauss_8;
-    }
-    abort(); // ???
-    return vec3(0.0, 0.0, 0.0, 0.0);
+    int c = state.index_gauss4;
+    if (c == 1) return random_gauss_1;
+    if (c == 2) return random_gauss_2;
+    if (c == 3) return random_gauss_3;
+    if (c == 4) return random_gauss_4;
+    if (c == 5) return random_gauss_5;
+    if (c == 6) return random_gauss_6;
+    if (c == 7) return random_gauss_7;
+    if (c == 8) return random_gauss_8;
+    //abort(); // ???
+    return vec4(0.0, 0.0, 0.0, 0.0);
 }
 
-vec3 rand_next_gauss4(inout rand_state_shared_uniforms state) {
-    return rand_next_gauss3(state).xyz;
+vec3 rand_next_gauss3(inout rand_state state) {
+    return rand_next_gauss4(state).xyz;
 }
 
-vec3 rand_next_uniform(inout rand_state_shared_uniforms state) {
+float rand_next_uniform(inout rand_state state) {
     int vec_number = state.index_uniform / 4;
-    int component = state.index_uniform % 4;
+    int component = state.index_uniform - vec_number * 4;
     state.index_uniform++;
     vec4 vec;
-    switch(vec_number) {
-      case 0: vec = random_uniforms_1; break;
-      case 1: vec = random_uniforms_2; break;
-      case 2: vec = random_uniforms_3; break;
-      case 3: vec = random_uniforms_4; break;
-      case 4: vec = random_uniforms_5; break;
-      case 5: vec = random_uniforms_6; break;
-      case 6: vec = random_uniforms_7; break;
-      case 7: vec = random_uniforms_8; break;
-      default: abort(); // ???
-    }
-    switch(component) {
-      case 0: return vec.x;
-      case 1: return vec.y;
-      case 2: return vec.z;
-      case 3: return vec.w;
-    }
+    if (vec_number == 0) vec = random_uniforms_1;
+    else if (vec_number == 1) vec = random_uniforms_2;
+    else if (vec_number == 2) vec = random_uniforms_3;
+    else if (vec_number == 3) vec = random_uniforms_4;
+    else if (vec_number == 4) vec = random_uniforms_5;
+    else if (vec_number == 5) vec = random_uniforms_6;
+    else if (vec_number == 6) vec = random_uniforms_7;
+    else if (vec_number == 7) vec = random_uniforms_8;
+    //else abort(); // ???
+
+    if (component == 0) return vec.x;
+    if (component == 1) return vec.y;
+    if (component == 2) return vec.z;
+    if (component == 3) return vec.w;
 }
