@@ -71,13 +71,16 @@ const dynamicTracers = {
   test: {
     "resolution": [640, 480],
     "source": preprocessFile('mains/monte_carlo.glsl', {
-      'renderer': 'renderer/pathtracer.glsl',
+      'renderer': 'renderer/bidirectional_tracer_1_light_vertex.glsl',
       'scene': 'scene/test.glsl',
       'camera': 'camera/pinhole.glsl',
       'rand': 'rand/fixed_vecs.glsl'
     }, Object.assign({
       'parameters': [
-        '#define N_BOUNCES 4'
+        '#define N_BOUNCES 4',
+
+        //'#define N_BOUNCES 1',
+        //'#define WEIGHTING_HEURISTIC HEURISTIC_DIRECT_ONLY'
       ].join('\n')
     }, TRACER_DATA)),
     "monte_carlo": true,

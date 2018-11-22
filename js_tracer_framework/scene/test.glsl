@@ -158,3 +158,21 @@ void get_pinhole_camera(out vec3 cam_pos, out vec3 cam_x, out vec3 cam_y, out ve
   cam_y = cross(cam_x, cam_z);
   cam_pos = -cam_z * cam_dist + camera_target;
 }
+
+// for bidirectional tracing
+int select_light(out vec3 light_point, out vec3 light_normal, out float sample_prob_density_per_area, float random_uniform, vec3 random_gauss) {
+      light_normal = normalize(random_gauss);
+      light_point = light_normal * light_r;
+      sample_prob_density_per_area = 1.0 / (UNIT_SPHERE_AREA*light_r*light_r * float(N_LIGHTS));
+
+      int light_object = OBJ_NONE;
+      if (random_uniform > 0.5) {
+        light_point += light_1_pos;
+        light_object = OBJ_LIGHT_1;
+      } else {
+        light_point += light_2_pos;
+        light_object = OBJ_LIGHT_2;
+      }
+
+      return light_object;
+}
