@@ -54,6 +54,47 @@ function GLSLBench({element, url, spec}) {
     })
   };
 
+  // simple jQuery replacements
+  const helpers = {
+    getFile(url, onSuccess, onError) {
+      const request = new XMLHttpRequest();
+      request.onload = (x) => {
+        onSuccess(request.response);
+      };
+      if (onError) {
+        request.onerror = onError;
+      } else {
+        request.onerror = () => {
+          throw new Error(`Failed to GET '${url}'`);
+        }
+      }
+      request.open("get", url, true);
+      request.send();
+    },
+
+    getJSON(url, onSuccess, onError) {
+      helpers.getFile(url, data => onSuccess(JSON.parse(data)), onError);
+    },
+
+    isString(x) {
+      // https://stackoverflow.com/a/17772086/1426569
+      return Object.prototype.toString.call(x) === "[object String]";
+    },
+
+    isObject(x) {
+      // https://stackoverflow.com/a/14706877/1426569
+      return !Array.isArray(x) && x === Object(x);
+    },
+
+    offset(el) {
+      const rect = el.getBoundingClientRect();
+      return {
+        top: rect.top + document.body.scrollTop,
+        left: rect.left + document.body.scrollLeft
+      };
+    }
+  }
+
   function generateRandom(distribution, size) {
 
     // TODO: Math.random is of low quality on older browsers
@@ -108,16 +149,13 @@ function GLSLBench({element, url, spec}) {
     if (shader_params.source) {
         setTimeout(() => doStart(shader_params.source), 0);
     } else if (shader_params.source_path) {
-        $.ajax(shader_folder + shader_params.source_path,
-            { contentType: 'text/plain' })
-            .done(doStart)
-            .error((x, status, err) => { throw err; });
+        helpers.getFile(shader_folder + shader_params.source_path, doStart);
     } else {
         throw new Error('No shader source code defined');
     }
 
     function buildFixed(value) {
-        if ($.type(value) === "array") {
+        if (Array.isArray(value)) {
             const vec = new THREE['Vector'+value.length](...value);
             return {
                 type: "v"+value.length,
@@ -249,18 +287,14 @@ function GLSLBench({element, url, spec}) {
     for (let key in shader_params.uniforms) {
         const val = shader_params.uniforms[key];
 
-        switch ($.type(val)) {
-            case "string":
-                const builder = buildDynamic(val);
-                bound_uniforms[key] = builder;
-                this.uniforms[key] = builder.declaration;
-                break;
-            case "object": // texture
-                loadTexture(key, shader_folder + val.file, THREE.NearestFilter);
-                break;
-            default:
-                this.uniforms[key] = buildFixed(val);
-                break;
+        if (helpers.isString(val)) {
+          const builder = buildDynamic(val);
+          bound_uniforms[key] = builder;
+          this.uniforms[key] = builder.declaration;
+        } else if (helpers.isObject(val)) {
+          loadTexture(key, shader_folder + val.file, THREE.NearestFilter);
+        } else {
+          this.uniforms[key] = buildFixed(val);
         }
     }
 
@@ -313,13 +347,13 @@ function GLSLBench({element, url, spec}) {
     }
     window.addEventListener( 'resize', onWindowResize, false );
 
-    $(document).mousemove((e) => {
-        const offset = $(container).offset();
-        mouse_pos.x = e.pageX - container.offsetLeft;
-        mouse_pos.y = e.pageY - container.offsetTop;
-        mouse_pos.rel_x = mouse_pos.x / container.offsetWidth;
-        mouse_pos.rel_y = mouse_pos.y / container.offsetHeight;
-    });
+    document.onmousemove = (e) => {
+      const offset = helpers.offset(container);
+      mouse_pos.x = e.pageX - container.offsetLeft;
+      mouse_pos.y = e.pageY - container.offsetTop;
+      mouse_pos.rel_x = mouse_pos.x / container.offsetWidth;
+      mouse_pos.rel_y = mouse_pos.y / container.offsetHeight;
+    };
 
     animate();
   }
@@ -455,7 +489,7 @@ function GLSLBench({element, url, spec}) {
     if (url) {
       if (spec) throw new Error("can't have both url and spec");
       shaderFolder = getFolderName(url);
-      $.getJSON(url, doStart);
+      helpers.getJSON(url, doStart);
     } else {
       doStart(spec);
     }

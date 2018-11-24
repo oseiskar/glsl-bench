@@ -13,7 +13,6 @@
     <body>
         <div id="shader-container">
         </div>
-        <script src="js_libs/jquery-2.1.4.min.js"></script>
         <script src="js_libs/three.min.js"></script>
         <script src="js_libs/Detector.js"></script>
         <script>
@@ -35,32 +34,30 @@
               return params;
           }
 
-          $(document).ready(function() {
-            const params = parseQueryString();
+          const params = parseQueryString();
 
-            const runtimeShaderParams = {};
-            if (params.fullscreen) {
-              $('body').toggleClass('fullscreen', true);
-              runtimeShaderParams.resolution = 'auto';
-            }
-            if (params.batch_size) {
-              runtimeShaderParams.batch_size = parseInt(params.batch_size);
-            }
+          const runtimeShaderParams = {};
+          if (params.fullscreen) {
+            document.getElementsByTagName('body')[0].className += ' fullscreen';
+            runtimeShaderParams.resolution = 'auto';
+          }
+          if (params.batch_size) {
+            runtimeShaderParams.batch_size = parseInt(params.batch_size);
+          }
 
-            const element = $('#shader-container')[0];
-            if (params.dynamicTracer) {
-              const spec = dynamicTracers[params.dynamicTracer];
-              for (let param in runtimeShaderParams) {
-                spec[param] = runtimeShaderParams[param];
-              }
-              new GLSLBench({ element, spec });
-            } else if (params.shader) {
-              new GLSLBench({ element, url: params.shader });
+          const element = document.getElementById('shader-container');
+          if (params.dynamicTracer) {
+            const spec = dynamicTracers[params.dynamicTracer];
+            for (let param in runtimeShaderParams) {
+              spec[param] = runtimeShaderParams[param];
             }
-            else {
-              throw "Please define a shader JSON in the query string";
-            }
-          });
+            new GLSLBench({ element, spec });
+          } else if (params.shader) {
+            new GLSLBench({ element, url: params.shader });
+          }
+          else {
+            throw "Please define a shader JSON in the query string";
+          }
         </script>
     </body>
 </html>
