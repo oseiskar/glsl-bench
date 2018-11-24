@@ -1,4 +1,5 @@
 "use strict";
+const TRACER_DATA = require('./tracer_data.js');
 
 function preprocessFile(mainFile, includeMapping, files) {
   // this might break down if utilizing heavy preprocessor magic near
@@ -67,7 +68,7 @@ function preprocessFile(mainFile, includeMapping, files) {
   return doPreprocess(mainFile);
 }
 
-const dynamicTracers = {
+module.exports = {
   test: {
     "resolution": [640, 480],
     "source": preprocessFile('mains/monte_carlo.glsl', {

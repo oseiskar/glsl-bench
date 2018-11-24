@@ -1,4 +1,4 @@
-const dynamicTracers = require('./browserified.js');
+const dynamicTracers = require('./dynamic_tracers.js');
 
 const params = new URLSearchParams(window.location.search);
 const runtimeShaderParams = {};

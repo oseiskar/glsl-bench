@@ -5,5 +5,10 @@
   },
   "devDependencies": {
     "watchify": "^3.11.0"
+  },
+  "scripts": {
+    "build": "./js_tracer_framework/build.sh && npm run browserify",
+    "browserify": "browserify -t brfs js_tracer_framework/app.js -o build/bundle.js",
+    "watch": "watchify -t brfs js_tracer_framework/app.js -o build/bundle.js"
   }
 }

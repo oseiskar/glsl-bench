@@ -6,5 +6,7 @@ outputs/
 build/
 node_modules/
 
+js_tracer_framework/tracer_data.js
+
 # for now
 package-lock.json
