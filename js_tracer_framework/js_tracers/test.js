@@ -20,7 +20,6 @@ module.exports = {
       "resolution": "resolution",
       "base_image": "previous_frame",
       "frame_number": "frame_number",
-      "tent_filter": "random_uniform_2",
       "random_gauss_1": "random_normal_4",
       "random_gauss_2": "random_normal_4",
       "random_gauss_3": "random_normal_4",
@@ -36,8 +35,6 @@ module.exports = {
       "random_uniforms_5": "random_uniform_4",
       "random_uniforms_6": "random_uniform_4",
       "random_uniforms_7": "random_uniform_4",
-      "random_uniforms_8": "random_uniform_4",
-      "light_sample": "random_normal_3",
-      "random_choice_sample": "random_uniform_1"
+      "random_uniforms_8": "random_uniform_4"
   }
 };

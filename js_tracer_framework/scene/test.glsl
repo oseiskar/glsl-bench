@@ -144,6 +144,9 @@ float get_ior(int which_object) {
   return 1.0;
 }
 
+#ifndef PINHOLE_CAMERA_INCLUDED
+#define PINHOLE_CAMERA_INCLUDED
+
 void get_pinhole_camera(out vec3 cam_pos, out vec3 cam_x, out vec3 cam_y, out vec3 cam_z, out float fov_angle) {
   // define camera
   fov_angle = DEG2RAD(50.0);
@@ -158,6 +161,8 @@ void get_pinhole_camera(out vec3 cam_pos, out vec3 cam_x, out vec3 cam_y, out ve
   cam_y = cross(cam_x, cam_z);
   cam_pos = -cam_z * cam_dist + camera_target;
 }
+
+#endif
 
 // for bidirectional tracing
 int select_light(out vec3 light_point, out vec3 light_normal, out float sample_prob_density_per_area, float random_uniform, vec3 random_gauss) {

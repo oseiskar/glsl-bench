@@ -1,3 +1,4 @@
+#include "parameters"
 #include "renderer"
 
 uniform vec2 resolution;

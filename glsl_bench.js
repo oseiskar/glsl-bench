@@ -18,7 +18,7 @@ function GLSLBench({element, url, spec}) {
     errorCallback = callback;
   };
 
-  let render, shader, frameBuffers, frameNumber, resolution;
+  let render, shader, frameBuffers, frameNumber, frameNumberSinceMotion, motionDirty, resolution;
   let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
 
   if (!element) {
@@ -239,6 +239,11 @@ function GLSLBench({element, url, spec}) {
             return frameNumber;
           };
           break;
+        case 'frame_number_since_motion':
+          return () => {
+            return frameNumberSinceMotion;
+          };
+          break;
         case 'previous_frame':
           return () => {
             const curBuffer = frameNumber % 2;
@@ -349,6 +354,7 @@ function GLSLBench({element, url, spec}) {
       position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0],
     };
     const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
+    const refreshEvery = parseInt(shader.params.refresh_every || 1);
 
     render = () => {
       try {
@@ -356,6 +362,13 @@ function GLSLBench({element, url, spec}) {
           x: gl.canvas.width,
           y: gl.canvas.height
         };
+
+        if (frameNumber % refreshEvery === 0) {
+          if (motionDirty) {
+            frameNumberSinceMotion = 0;
+            motionDirty = false;
+          }
+        }
 
         shader.update();
         if (anyErrors) return;
@@ -377,8 +390,7 @@ function GLSLBench({element, url, spec}) {
 
           // renderer.render( scene, camera, currentTarget );
 
-          const refreshEvery = parseInt(shader.params.refresh_every || 1);
-          if (frameNumber % refreshEvery === 0) {
+          if (frameNumber % refreshEvery === refreshEvery-1) {
             gl.useProgram(copyProgramInfo.program);
             twgl.bindFramebufferInfo(gl, null);
             twgl.setBuffersAndAttributes(gl, copyProgramInfo, bufferInfo);
@@ -390,7 +402,9 @@ function GLSLBench({element, url, spec}) {
             twgl.drawBufferInfo(gl, bufferInfo);
           }
         }
+
         frameNumber++;
+        frameNumberSinceMotion++;
 
         twgl.drawBufferInfo(gl, bufferInfo);
       } catch (err) {
@@ -406,6 +420,7 @@ function GLSLBench({element, url, spec}) {
     window.addEventListener( 'resize', onWindowResize, false );
 
     document.onmousemove = (e) => {
+      motionDirty = true;
       const offset = helpers.offset(container);
       mouse_pos.x = e.pageX - container.offsetLeft;
       mouse_pos.y = e.pageY - container.offsetTop;
@@ -433,6 +448,7 @@ function GLSLBench({element, url, spec}) {
       ];
     }
     frameNumber = 0;
+    motionDirty = true;
   }
 
   function onWindowResize( event ) {
