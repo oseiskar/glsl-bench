@@ -48,10 +48,10 @@ function GLSLBench({element, url, spec}) {
   }
   `;
 
-  const RAW_FRAGMENT_SHADER_PREFIX = `
-  precision highp float;
-  precision highp int;
-  `;
+  const RAW_FRAGMENT_SHADER_PREFIX = [
+    "precision highp float;",
+    "precision highp int;"
+  ].join("\n") + "\n";
 
   const COPY_FRAGMENT_SHADER = `
   uniform sampler2D source;
@@ -299,23 +299,21 @@ function GLSLBench({element, url, spec}) {
     };
   }
 
-  const webglHelpers = {
-    parseShaderErrorWithContext(msg, code) {
-      const match = /ERROR:\s*\d+:(\d+)/.exec(msg);
-      const errorLineNo = match && match[1];
-      if (errorLineNo) {
-        const lines = code.split('\n');
-        const i = parseInt(errorLineNo)-1;
-        const msg = [i-1, i, i+1].map(j => ({ lineNo: j+1, line: lines[j]}))
-          .filter(x => x.line)
-          .map(x => `${x.lineNo}: ${x.line}`)
-          .join('\n');
+  function parseShaderErrorWithContext(msg, code) {
+    const match = /\**\s*ERROR:\s*\d+:(\d+)/.exec(msg);
+    const errorLineNo = match && match[1];
+    if (errorLineNo) {
+      const lines = code.split('\n');
+      const i = parseInt(errorLineNo)-1;
+      const context = [i-1, i, i+1].map(j => ({ lineNo: j+1, line: lines[j]}))
+        .filter(x => x.line !== undefined)
+        .map(x => `${x.lineNo}: ${x.line}`)
+        .join('\n');
 
-        return '\n' + msg;
-      }
-
-      return `Shader error: ${msg}`;
+      return msg + '\n' + context;
     }
+
+    return `Shader error: ${msg}`;
   }
 
   function createRenderTarget(sizeX, sizeY) {
@@ -329,11 +327,16 @@ function GLSLBench({element, url, spec}) {
     }], sizeX, sizeY);
   }
 
-  function init() {
+  const init = () => {
+    this.fragmentShaderSource = RAW_FRAGMENT_SHADER_PREFIX + shader.source;
     const programInfo = twgl.createProgramInfo(gl, [
       VERTEX_SHADER_SOURCE,
-      RAW_FRAGMENT_SHADER_PREFIX + shader.source
-    ], { errorCallback: error });
+      this.fragmentShaderSource
+    ], { errorCallback: (sourceAndError) => {
+      const src = this.fragmentShaderSource;
+      const errorMsg = sourceAndError.split("\n").slice(src.split("\n").length).join("\n");
+      error(parseShaderErrorWithContext(errorMsg, src));
+    }});
 
     const copyProgramInfo = twgl.createProgramInfo(gl, [
       VERTEX_SHADER_SOURCE,
