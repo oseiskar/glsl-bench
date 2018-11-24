@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "browserify": "^16.2.3",
+    "brfs": "^2.0.1"
+  },
+  "devDependencies": {
+    "watchify": "^3.11.0"
+  }
+}

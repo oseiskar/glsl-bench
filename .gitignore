@@ -4,3 +4,7 @@
 shader.html
 outputs/
 build/
+node_modules/
+
+# for now
+package-lock.json

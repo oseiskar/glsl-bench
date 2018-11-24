@@ -15,26 +15,6 @@
         </div>
         <script src="js_libs/twgl.min.js"></script>
         <script src="glsl_bench.js"></script>
-        <script src="build/tracer_data.js"></script>
-        <script>
-          const params = new URLSearchParams(window.location.search);
-
-          const runtimeShaderParams = {};
-          if (params.has('fullscreen')) {
-            document.getElementsByTagName('body')[0].className += ' fullscreen';
-            runtimeShaderParams.resolution = 'auto';
-          }
-          if (params.has('batch_size')) {
-            runtimeShaderParams.batch_size = parseInt(params.get('batch_size'));
-          }
-
-          const element = document.getElementById('shader-container');
-          const spec = dynamicTracers[params.get('tracer')];
-          for (let param in runtimeShaderParams) {
-            spec[param] = runtimeShaderParams[param];
-          }
-
-          new GLSLBench({ element, spec });
-        </script>
+        <script src="build/bundle.js"></script>
     </body>
 </html>
