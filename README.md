@@ -1,6 +1,6 @@
 # glsl-bench
 
-A simple Python framework for running GLSL demos and Monte Carlo image generation,
+A simple Python and JavaScript (WebGL) framework for running GLSL demos and Monte Carlo image generation,
 e.g., raytracers. Similar to [Shadertoy](https://www.shadertoy.com/) in basic
 functionality but runs locally.
 
@@ -19,4 +19,4 @@ or
  * Specifying textures in configuration files
  * Image output in raw float (`.npy`) and PNG formats
 
-**Dependencies**: `pygame`, `scipy`, `pystache` (if using templates)
+**Dependencies**: `pygame`, `scipy`
