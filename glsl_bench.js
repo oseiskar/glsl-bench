@@ -1,6 +1,5 @@
 "use strict"
-/*global THREE, Detector, $, dat:false */
-/*global document, window, setTimeout, requestAnimationFrame:false */
+/*global twgl, document, window, setTimeout, requestAnimationFrame:false */
 
 function GLSLBench({element, url, spec}) {
 
@@ -19,13 +18,23 @@ function GLSLBench({element, url, spec}) {
     errorCallback = callback;
   };
 
-  let scene, camera, mesh, renderer, shader, frameBuffers, frameNumber;
+  let render, shader, frameBuffers, frameNumber, resolution;
   let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
 
   if (!element) {
     return error('Missing attribute: (DOM) element');
   }
+
+  // try to initialize WebGL
   const container = element;
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext("webgl");
+
+  if (gl === null) {
+    return error("Unable to initialize WebGL. Your browser or machine may not support it.");
+  }
+
+  container.appendChild(canvas);
 
   const VERTEX_SHADER_SOURCE = `
   precision highp float;
@@ -51,23 +60,6 @@ function GLSLBench({element, url, spec}) {
     gl_FragColor = texture2D(source, gl_FragCoord.xy / resolution.xy);
   }
   `;
-
-  const trivialShaders = {
-    copy: new THREE.RawShaderMaterial({
-      uniforms: {
-        source: {
-          type: 't',
-          value: null
-        },
-        resolution: {
-          type: 'vec2',
-          value: new THREE.Vector2(0,0)
-        }
-      },
-      vertexShader: VERTEX_SHADER_SOURCE,
-      fragmentShader: RAW_FRAGMENT_SHADER_PREFIX + COPY_FRAGMENT_SHADER
-    })
-  };
 
   // simple jQuery replacements
   const helpers = {
@@ -184,194 +176,224 @@ function GLSLBench({element, url, spec}) {
     }
 
     function buildFixed(value) {
-        if (Array.isArray(value)) {
-            const vec = new THREE['Vector'+value.length](...value);
-            return {
-                type: "v"+value.length,
-                value: vec
-            };
-        } else {
-            return { type: "f", value: value };
-        }
+      if (Array.isArray(value)) {
+        return new Float32Array(value);
+      } else {
+        return value;
+      }
     }
 
     function buildRandom(val) {
-        // TODO: this encoding is silly
-        const parts = val.split('_');
-        const distribution = parts[1];
+      // TODO: this encoding is silly
+      const parts = val.split('_');
+      const distribution = parts[1];
 
-        let size = 1;
-        if (parts.length > 2) {
-          size = parts[2];
-          if (parts.length > 3 || size > 4) {
-            throw new Error('invalid random '+val);
-          }
+      let size = 1;
+      if (parts.length > 2) {
+        size = parts[2];
+        if (parts.length > 3 || size > 4) {
+          throw new Error('invalid random '+val);
         }
+      }
 
-        let init, updater;
-
-        if (size > 1) {
-          init = {
-            type: 'v' + size,
-            value: new THREE['Vector'+size]()
-          };
-          updater = (v) => {
-            const sample = generateRandom(distribution, size);
-            const letters = 'xyzw';
-            for (let i = 0; i < size; ++i) {
-              v.value[letters[i]] = sample[i];
-            }
-          };
-        } else {
-          init = {
-            type: 'f',
-            value: 0
-          };
-          updater = (v) => {
-            v.value = generateRandom(distribution, 1)[0];
-          };
-        }
-
-        return { declaration: init, updater };
+      if (size > 1) {
+        return () => {
+          return new Float32Array(generateRandom(distribution, size));
+        };
+      } else {
+        return () => {
+          return generateRandom(distribution, 1)[0];
+        };
+      }
     }
 
     function buildDynamic(val) {
-
-        let init = { type: 'f', value: 0.0 };
-        let updater = x => {};
-
-        switch(val) {
-            case 'time':
-                updater = (v) => {
-                    v.value = (new Date().getTime() - time0) / 1000.0;
-                };
-                break;
-            case 'resolution':
-                init = buildFixed([1,1]);
-                updater = (v) => {
-                    v.value.x = renderer.domElement.width;
-                    v.value.y = renderer.domElement.height;
-                };
-                break;
-            case 'mouse':
-                init = buildFixed([0,0]);
-                updater = (v) => {
-                    v.value.x = mouse_pos.x;
-                    v.value.y = mouse_pos.y;
-                };
-                break;
-            case 'relative_mouse':
-                init = buildFixed([0,0]);
-                updater = (v) => {
-                    v.value.x = mouse_pos.rel_x;
-                    v.value.y = mouse_pos.rel_y;
-                };
-                break;
-            case 'frame_number':
-                updater = (v) => {
-                  v.value = frameNumber;
-                };
-                break;
-            case 'previous_frame':
-                init = {
-                    type: "t",
-                    value: null
-                };
-                updater = (v) => {
-                    const curBuffer = frameNumber % 2;
-                    v.value = frameBuffers[1 - curBuffer].texture;
-                };
-                break;
-            default:
-                if (val.startsWith('random_')) {
-                  return buildRandom(val);
-                }
-                else {
-                  throw new Error("invalid uniform mapping " + val);
-                }
-        }
-
-        return { declaration: init, updater: updater };
+      switch(val) {
+        case 'time':
+          return (v) => {
+            return (new Date().getTime() - time0) / 1000.0;
+          };
+        case 'resolution':
+          return () => {
+            return new Float32Array([
+              resolution.x,
+              resolution.y
+            ]);
+          };
+        case 'mouse':
+          return () => {
+            return new Float32Array([
+              mouse_pos.x,
+              mouse_pos.y
+            ]);
+          };
+        case 'relative_mouse':
+          return () => {
+            return new Float32Array([
+              mouse_pos.rel_x,
+              mouse_pos.rel_y
+            ]);
+          };
+        case 'frame_number':
+          return () => {
+            return frameNumber;
+          };
+          break;
+        case 'previous_frame':
+          return () => {
+            const curBuffer = frameNumber % 2;
+            return frameBuffers[1 - curBuffer].attachments[0];
+          };
+        default:
+          if (val.startsWith('random_')) {
+            return buildRandom(val);
+          }
+          else {
+            throw new Error("invalid uniform mapping " + val);
+          }
+      }
     }
 
     this.uniforms = {};
 
-    const texLoader = new THREE.TextureLoader();
-    const loadTexture = (symbol, filename, interpolation) => {
-        textures[symbol] = null;
-        texLoader.load(filename, (tex) => {
-            tex.magFilter = interpolation;
-            tex.minFilter = interpolation;
-            textures[symbol] = tex;
-            this.uniforms[symbol] = {
-                type: "t",
-                value: tex
-            };
-            checkLoaded();
-        });
+    const loadTexture = (symbol, filename, options = {}) => {
+      textures[symbol] = null;
+      twgl.createTexture(gl, Object.assign({
+        src: filename,
+        mag: gl.NEAREST,
+        min: gl.NEAREST
+      }, options), (err, tex, source) => {
+        if (err) {
+          return error(err);
+        }
+        textures[symbol] = tex;
+        this.uniforms[symbol] = tex;
+        checkLoaded();
+      });
     }
 
     const bound_uniforms = {};
 
     for (let key in shader_params.uniforms) {
-        const val = shader_params.uniforms[key];
+      const val = shader_params.uniforms[key];
 
-        try {
-          if (helpers.isString(val)) {
-            const builder = buildDynamic(val);
-            bound_uniforms[key] = builder;
-            this.uniforms[key] = builder.declaration;
-          } else if (helpers.isObject(val)) {
-            loadTexture(key, shader_folder + val.file, THREE.NearestFilter);
-          } else {
-            this.uniforms[key] = buildFixed(val);
-          }
-        } catch (err) {
-          return error(err.message);
+      try {
+        if (helpers.isString(val)) {
+          const builder = buildDynamic(val);
+          bound_uniforms[key] = builder;
+          this.uniforms[key] = builder.declaration;
+        } else if (helpers.isObject(val)) {
+          loadTexture(key, shader_folder + val.file);
+        } else {
+          this.uniforms[key] = buildFixed(val);
         }
+      } catch (err) {
+        return error(err.message);
+      }
     }
 
     this.update = () => {
-        for (let key in bound_uniforms) {
-            bound_uniforms[key].updater(this.uniforms[key]);
-        }
+      for (let key in bound_uniforms) {
+        this.uniforms[key] = bound_uniforms[key]();
+      }
     };
   }
 
+  const webglHelpers = {
+    parseShaderErrorWithContext(msg, code) {
+      const match = /ERROR:\s*\d+:(\d+)/.exec(msg);
+      const errorLineNo = match && match[1];
+      if (errorLineNo) {
+        const lines = code.split('\n');
+        const i = parseInt(errorLineNo)-1;
+        const msg = [i-1, i, i+1].map(j => ({ lineNo: j+1, line: lines[j]}))
+          .filter(x => x.line)
+          .map(x => `${x.lineNo}: ${x.line}`)
+          .join('\n');
+
+        return '\n' + msg;
+      }
+
+      return `Shader error: ${msg}`;
+    }
+  }
+
   function createRenderTarget(sizeX, sizeY) {
-		return new THREE.WebGLRenderTarget(sizeX, sizeY, {
-        wrapS: THREE.ClampToEdgeWrapping,
-        wrapT: THREE.ClampToEdgeWrapping,
-        minFilter: THREE.NearestFilter,
-        magFilter: THREE.NearestFilter,
-        format: THREE.RGBAFormat,
-        // iPads/pods/phones don't necessarily support this
-        type: THREE.FloatType,
-        stencilBuffer: false,
-        depthBuffer: false
-    });
+    gl.getExtension('OES_texture_float');
+    return twgl.createFramebufferInfo(gl, [{
+      format: gl.RGBA,
+      type: gl.FLOAT,
+      min: gl.NEAREST,
+      mag: gl.NEAREST,
+      wrap: gl.CLAMP_TO_EDGE
+    }], sizeX, sizeY);
   }
 
   function init() {
-    scene = new THREE.Scene();
+    const programInfo = twgl.createProgramInfo(gl, [
+      VERTEX_SHADER_SOURCE,
+      RAW_FRAGMENT_SHADER_PREFIX + shader.source
+    ], { errorCallback: error });
 
-    const geometry = new THREE.PlaneBufferGeometry( 2, 2 );
+    const copyProgramInfo = twgl.createProgramInfo(gl, [
+      VERTEX_SHADER_SOURCE,
+      RAW_FRAGMENT_SHADER_PREFIX + COPY_FRAGMENT_SHADER
+    ], { errorCallback: error });
 
-    shader.material = new THREE.RawShaderMaterial({
-        uniforms: shader.uniforms,
-        vertexShader: VERTEX_SHADER_SOURCE,
-        fragmentShader:
-          RAW_FRAGMENT_SHADER_PREFIX +
-          shader.source
-    });
+  if (!programInfo || !copyProgramInfo) return;
 
-    mesh = new THREE.Mesh( geometry, shader.material );
-    scene.add( mesh );
+    const arrays = {
+      position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0],
+    };
+    const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
 
-    renderer = new THREE.WebGLRenderer();
-    renderer.setPixelRatio( window.devicePixelRatio );
+    render = () => {
+      try {
+        resolution = {
+          x: gl.canvas.width,
+          y: gl.canvas.height
+        };
 
-    container.appendChild( renderer.domElement );
+        shader.update();
+        if (anyErrors) return;
+
+        gl.useProgram(programInfo.program);
+        twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
+        twgl.setUniforms(programInfo, shader.uniforms);
+
+        // TODO: rather undescriptive
+        if (!shader.params.monte_carlo && !shader.params.float_buffers) {
+          // render directly to screen
+          twgl.drawBufferInfo(gl, bufferInfo);
+
+        } else {
+          const currentTarget = frameBuffers[frameNumber % 2];
+
+          twgl.bindFramebufferInfo(gl, currentTarget);
+          twgl.drawBufferInfo(gl, bufferInfo);
+
+          // renderer.render( scene, camera, currentTarget );
+
+          const refreshEvery = parseInt(shader.params.refresh_every || 1);
+          if (frameNumber % refreshEvery === 0) {
+            gl.useProgram(copyProgramInfo.program);
+            twgl.bindFramebufferInfo(gl, null);
+            twgl.setBuffersAndAttributes(gl, copyProgramInfo, bufferInfo);
+            twgl.setUniforms(copyProgramInfo, {
+              source: currentTarget.attachments[0],
+              resolution: [resolution.x, resolution.y]
+            });
+
+            twgl.drawBufferInfo(gl, bufferInfo);
+          }
+        }
+        frameNumber++;
+
+        twgl.drawBufferInfo(gl, bufferInfo);
+      } catch (err) {
+        error(err.message);
+      }
+    }
 
     if (shader.params.resolution === 'auto') {
       onWindowResize();
@@ -392,13 +414,12 @@ function GLSLBench({element, url, spec}) {
   }
 
   function setSize(sizeX, sizeY) {
-    renderer.setSize(sizeX, sizeY);
-    camera = new THREE.PerspectiveCamera( 45, sizeX / sizeY, 1, 80000 );
+    canvas.width = sizeX;
+    canvas.height = sizeY;
 
-    trivialShaders.copy.uniforms.resolution.value.x = sizeX;
-    trivialShaders.copy.uniforms.resolution.value.y = sizeY;
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-    if (frameBuffers) frameBuffers.forEach(fb => fb.dispose());
+    if (frameBuffers) frameBuffers.forEach(fb => gl.deleteFrameBuffer(fb.framebuffer));
 
     // TODO rather undescriptive
     if (shader.params.monte_carlo || shader.params.float_buffers) {
@@ -409,12 +430,10 @@ function GLSLBench({element, url, spec}) {
       ];
     }
     frameNumber = 0;
-
-    shader.update();
   }
 
   function onWindowResize( event ) {
-    console.log('window size changed');
+    //console.log('window size changed');
     if (shader.params.resolution === 'auto') {
       setSize(window.innerWidth, window.innerHeight);
     }
@@ -447,64 +466,6 @@ function GLSLBench({element, url, spec}) {
         return diff;
     };
   })();
-
-  function parseShaderError(diagnostics, code) {
-    const msg = diagnostics.fragmentShader.log;
-    const match = /ERROR:\s*\d+:(\d+)/.exec(msg);
-    const errorLineNo = match && match[1];
-    if (errorLineNo) {
-      const lines = code.split('\n');
-      const i = parseInt(errorLineNo)-1;
-      const msg = [i-1, i, i+1].map(j => ({ lineNo: j+1, line: lines[j]}))
-        .filter(x => x.line)
-        .map(x => `${x.lineNo}: ${x.line}`)
-        .join('\n');
-
-      return '\n' + msg;
-    }
-
-    return `Could not interpret error: ${msg} (${JSON.stringify(diagnostics)})`;
-  }
-
-  function render() {
-    // stop if errors have been encountered
-    if (anyErrors) return;
-
-    shader.update();
-
-    function tryRender(f) {
-      f();
-      if (shader.material.program.diagnostics) {
-        console.log();
-        shader.stop();
-        return error(parseShaderError(shader.material.program.diagnostics, shader.material.program.code));
-      }
-    }
-
-    // TODO: rather undescriptive
-    if (!shader.params.monte_carlo && !shader.params.float_buffers) {
-      // render directly to screen
-      tryRender(() => { renderer.render( scene, camera ); });
-      ;
-    } else {
-      const currentTarget = frameBuffers[frameNumber % 2];
-      tryRender(() => { renderer.render( scene, camera, currentTarget ); });
-
-      const refreshEvery = parseInt(shader.params.refresh_every || 1);
-      if (frameNumber % refreshEvery === 0) {
-        const curMaterial = mesh.material;
-        const copyParams = trivialShaders.copy.uniforms;
-
-        mesh.material = trivialShaders.copy;
-        copyParams.source.value = currentTarget.texture;
-
-        renderer.render( scene, camera );
-        mesh.material = curMaterial;
-      }
-    }
-
-    frameNumber++;
-  }
 
   function startShader({url, spec}) {
     function getFolderName(str) {
