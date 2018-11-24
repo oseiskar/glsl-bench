@@ -1,38 +1,35 @@
 "use strict"
 /*global THREE, Detector, $, dat:false */
 /*global document, window, setTimeout, requestAnimationFrame:false */
-/*global ProceduralTextures:false */
 
-let container, scene, camera, mesh, renderer, shader, frameBuffers, frameNumber;
-let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
+function GLSLBench({element, url, spec}) {
 
-const VERTEX_SHADER_SOURCE = `
+  let scene, camera, mesh, renderer, shader, frameBuffers, frameNumber;
+  let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
+
+  if (!element) {
+    throw new Error('Missing attribute: (DOM) element');
+  }
+  const container = element;
+
+  const VERTEX_SHADER_SOURCE = `
   precision highp float;
   precision highp int;
-
-  uniform mat4 modelMatrix;
-  uniform mat4 modelViewMatrix;
-  uniform mat4 projectionMatrix;
-  uniform mat4 viewMatrix;
-  uniform mat3 normalMatrix;
-  uniform vec3 cameraPosition;
   attribute vec3 position;
-  attribute vec3 normal;
-  attribute vec2 uv;
 
   varying vec3 pos;
   void main() {
       pos = position;
       gl_Position = vec4( position, 1.0 );
   }
-`;
+  `;
 
-const RAW_FRAGMENT_SHADER_PREFIX = `
+  const RAW_FRAGMENT_SHADER_PREFIX = `
   precision highp float;
   precision highp int;
-`;
+  `;
 
-const COPY_FRAGMENT_SHADER = `
+  const COPY_FRAGMENT_SHADER = `
   uniform sampler2D source;
   uniform vec2 resolution;
   void main() {
@@ -40,8 +37,8 @@ const COPY_FRAGMENT_SHADER = `
   }
   `;
 
-const trivialShaders = {
-  copy: new THREE.RawShaderMaterial({
+  const trivialShaders = {
+    copy: new THREE.RawShaderMaterial({
       uniforms: {
         source: {
           type: 't',
@@ -54,46 +51,42 @@ const trivialShaders = {
       },
       vertexShader: VERTEX_SHADER_SOURCE,
       fragmentShader: RAW_FRAGMENT_SHADER_PREFIX + COPY_FRAGMENT_SHADER
-  })
-};
+    })
+  };
 
-function startShader(shader_params, shader_folder) {
-  shader = new Shader(shader_params, shader_folder);
-}
+  function generateRandom(distribution, size) {
 
-function generateRandom(distribution, size) {
+    // TODO: Math.random is of low quality on older browsers
+    // but Xorshift128+ on newer
 
-  // TODO: Math.random is of low quality on older browsers
-  // but Xorshift128+ on newer
-
-  // from https://stackoverflow.com/a/36481059/1426569
-  // Standard Normal variate using Box-Muller transform
-  function randnBoxMuller() {
+    // from https://stackoverflow.com/a/36481059/1426569
+    // Standard Normal variate using Box-Muller transform
+    function randnBoxMuller() {
       var u = 0, v = 0;
       while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
       while(v === 0) v = Math.random();
       return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
-  }
-
-  const generate = () => {
-    switch (distribution) {
-      case 'uniform':
-        return Math.random();
-      case 'normal':
-        return randnBoxMuller();
-      default:
-        throw new Error('invalid random distribution '+distribution);
     }
+
+    const generate = () => {
+      switch (distribution) {
+        case 'uniform':
+          return Math.random();
+        case 'normal':
+          return randnBoxMuller();
+        default:
+          throw new Error('invalid random distribution '+distribution);
+      }
+    }
+
+    const sample = [];
+    for (let i=0; i<size; ++i) {
+      sample.push(generate());
+    }
+    return sample;
   }
 
-  const sample = [];
-  for (let i=0; i<size; ++i) {
-    sample.push(generate());
-  }
-  return sample;
-}
-
-function Shader(shader_params, shader_folder) {
+  function Shader(shader_params, shader_folder) {
 
     const time0 = new Date().getTime();
     const textures = {};
@@ -276,9 +269,9 @@ function Shader(shader_params, shader_folder) {
             bound_uniforms[key].updater(this.uniforms[key]);
         }
     };
-}
+  }
 
-function createRenderTarget(sizeX, sizeY) {
+  function createRenderTarget(sizeX, sizeY) {
 		return new THREE.WebGLRenderTarget(sizeX, sizeY, {
         wrapS: THREE.ClampToEdgeWrapping,
         wrapT: THREE.ClampToEdgeWrapping,
@@ -290,13 +283,9 @@ function createRenderTarget(sizeX, sizeY) {
         stencilBuffer: false,
         depthBuffer: false
     });
-}
+  }
 
-function init() {
-
-    container = document.createElement( 'div' );
-    document.body.appendChild( container );
-
+  function init() {
     scene = new THREE.Scene();
 
     const geometry = new THREE.PlaneBufferGeometry( 2, 2 );
@@ -333,9 +322,9 @@ function init() {
     });
 
     animate();
-}
+  }
 
-function setSize(sizeX, sizeY) {
+  function setSize(sizeX, sizeY) {
     renderer.setSize(sizeX, sizeY);
     camera = new THREE.PerspectiveCamera( 45, sizeX / sizeY, 1, 80000 );
 
@@ -355,16 +344,16 @@ function setSize(sizeX, sizeY) {
     frameNumber = 0;
 
     shader.update();
-}
+  }
 
-function onWindowResize( event ) {
+  function onWindowResize( event ) {
     console.log('window size changed');
     if (shader.params.resolution === 'auto') {
       setSize(window.innerWidth, window.innerHeight);
     }
-}
+  }
 
-function animate() {
+  function animate() {
     if (shader.params.monte_carlo) {
       // render as fast as possible
       const renderBatchSize = parseInt(shader.params.batch_size || 1);
@@ -380,9 +369,9 @@ function animate() {
       shader.stop = () => cancelAnimationFrame(timer);
     }
     render();
-}
+  }
 
-const getFrameDuration = (() => {
+  const getFrameDuration = (() => {
     let lastTimestamp = new Date().getTime();
     return () => {
         const timestamp = new Date().getTime();
@@ -390,9 +379,9 @@ const getFrameDuration = (() => {
         lastTimestamp = timestamp;
         return diff;
     };
-})();
+  })();
 
-function parseShaderError(diagnostics, code) {
+  function parseShaderError(diagnostics, code) {
     const msg = diagnostics.fragmentShader.log;
     const match = /ERROR:\s*\d+:(\d+)/.exec(msg);
     const errorLineNo = match && match[1];
@@ -408,9 +397,9 @@ function parseShaderError(diagnostics, code) {
     }
 
     return `Could not interpret error: ${msg} (${JSON.stringify(diagnostics)})`;
-}
+  }
 
-function render() {
+  function render() {
     shader.update();
 
     function tryRender(f) {
@@ -445,26 +434,32 @@ function render() {
     }
 
     frameNumber++;
-}
+  }
 
-// stupid helpers
-function parseQueryString() {
-    const params = {};
-    const qstring = window.location.search.split('?')[1];
-    if (qstring === undefined) return params;
-    const strs = qstring.split('&');
-    for (let i in strs) {
-        const nameAndValue = strs[i].split('=');
-        params[nameAndValue[0]] = decodeURIComponent(nameAndValue[1]);
+  function startShader({url, spec}) {
+    function getFolderName(str) {
+        const parts = str.split('/');
+        if (parts.length == 1) return '';
+        parts.pop();
+        let folder = parts.join('/');
+        if (parts.pop() !== '') folder += '/'; // add trailing /
+        return folder;
     }
-    return params;
-}
 
-function getFolderName(str) {
-    const parts = str.split('/');
-    if (parts.length == 1) return '';
-    parts.pop();
-    let folder = parts.join('/');
-    if (parts.pop() !== '') folder += '/'; // add trailing /
-    return folder;
+    let shaderFolder = '/';
+
+    function doStart(shaderParams) {
+      shader = new Shader(shaderParams, shaderFolder);
+    }
+
+    if (url) {
+      if (spec) throw new Error("can't have both url and spec");
+      shaderFolder = getFolderName(url);
+      $.getJSON(url, doStart);
+    } else {
+      doStart(spec);
+    }
+  }
+
+  startShader({url, spec});
 }
