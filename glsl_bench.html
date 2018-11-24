@@ -3,63 +3,19 @@
     <head>
         <title>GLSL bench</title>
         <meta charset="utf-8">
-        <style>
-        body.fullscreen {
-          margin: 0 !important;
-          overflow: hidden !important;
-        }
-        </style>
     </head>
     <body>
         <div id="shader-container">
         </div>
         <script src="js_libs/twgl.min.js"></script>
         <script src="glsl_bench.js"></script>
-        <script src="build/tracer_data.js"></script>
         <script>
-          // stupid helpers
-          function parseQueryString() {
-              const params = {};
-              const qstring = window.location.search.split('?')[1];
-              if (qstring === undefined) return params;
-              const strs = qstring.split('&');
-              for (let i in strs) {
-                  const nameAndValue = strs[i].split('=');
-                  params[nameAndValue[0]] = decodeURIComponent(nameAndValue[1]);
-              }
-              return params;
-          }
-
-          const params = parseQueryString();
-
-          const runtimeShaderParams = {};
-          if (params.fullscreen) {
-            document.getElementsByTagName('body')[0].className += ' fullscreen';
-            runtimeShaderParams.resolution = 'auto';
-          }
-          if (params.batch_size) {
-            runtimeShaderParams.batch_size = parseInt(params.batch_size);
-          }
-
-          let benchOptions;
+          const params = new URLSearchParams(window.location.search);
           const element = document.getElementById('shader-container');
-          if (params.dynamicTracer) {
-            const spec = dynamicTracers[params.dynamicTracer];
-            for (let param in runtimeShaderParams) {
-              spec[param] = runtimeShaderParams[param];
-            }
-            benchOptions = { element, spec };
-          } else if (params.shader) {
-            benchOptions = { element, url: params.shader };
-          } else {
-            throw new Error("Please define a shader JSON in the query string");
-          }
-
-          new GLSLBench(benchOptions)
+          new GLSLBench({ element, url: params.get('shader') })
             .onError(err => {
               throw new Error(`Shader failed: ${err}`);
             });
-
         </script>
     </body>
 </html>
