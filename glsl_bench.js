@@ -1,14 +1,44 @@
 "use strict"
-/*global THREE, Mustache, Detector, $, dat:false */
+/*global THREE, Detector, $, dat:false */
 /*global document, window, setTimeout, requestAnimationFrame:false */
 /*global ProceduralTextures:false */
-
-if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
 let container, scene, camera, mesh, renderer, shader, frameBuffers, frameNumber;
 let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
 
-const VERTEX_SHADER_SOURCE = $('#vertex-shader').text();
+const VERTEX_SHADER_SOURCE = `
+  precision highp float;
+  precision highp int;
+
+  uniform mat4 modelMatrix;
+  uniform mat4 modelViewMatrix;
+  uniform mat4 projectionMatrix;
+  uniform mat4 viewMatrix;
+  uniform mat3 normalMatrix;
+  uniform vec3 cameraPosition;
+  attribute vec3 position;
+  attribute vec3 normal;
+  attribute vec2 uv;
+
+  varying vec3 pos;
+  void main() {
+      pos = position;
+      gl_Position = vec4( position, 1.0 );
+  }
+`;
+
+const RAW_FRAGMENT_SHADER_PREFIX = `
+  precision highp float;
+  precision highp int;
+`;
+
+const COPY_FRAGMENT_SHADER = `
+  uniform sampler2D source;
+  uniform vec2 resolution;
+  void main() {
+    gl_FragColor = texture2D(source, gl_FragCoord.xy / resolution.xy);
+  }
+  `;
 
 const trivialShaders = {
   copy: new THREE.RawShaderMaterial({
@@ -23,9 +53,7 @@ const trivialShaders = {
         }
       },
       vertexShader: VERTEX_SHADER_SOURCE,
-      fragmentShader:
-        $('#raw-fragment-shader-prefix').text() +
-        $('#copy-fragment-shader').text()
+      fragmentShader: RAW_FRAGMENT_SHADER_PREFIX + COPY_FRAGMENT_SHADER
   })
 };
 
@@ -80,8 +108,6 @@ function Shader(shader_params, shader_folder) {
 
     const doStart = (shader_source) => {
         //console.log(shader_source);
-        if (shader_params.mustache)
-            shader_source = Mustache.render(shader_source, shader_params.mustache);
         this.source = shader_source;
         checkLoaded();
     };
@@ -279,7 +305,7 @@ function init() {
         uniforms: shader.uniforms,
         vertexShader: VERTEX_SHADER_SOURCE,
         fragmentShader:
-          $('#raw-fragment-shader-prefix').text() +
+          RAW_FRAGMENT_SHADER_PREFIX +
           shader.source
     });
 

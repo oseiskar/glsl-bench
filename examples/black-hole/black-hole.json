@@ -1,6 +1,6 @@
 {
     "resolution": [1200, 800],
-    "source_path": "black-hole.glsl.mustache",
+    "source_path": "black-hole.glsl",
     "uniforms": {
         "time": "time",
         "resolution": "resolution",
@@ -17,17 +17,5 @@
         "accretion_disk_texture": { "file": "accretion-disk.png" },
         "planet_texture": { "file": "beach-ball.png" },
         "spectrum_texture": { "file": "spectra.png" }
-    },
-    "mustache": {
-        "n_steps": 100,
-        "accretion_disk": true,
-        "planetEnabled": true,
-        "lorentz_contraction": true,
-        "gravitational_time_dilation": true,
-        "aberration": true,
-        "beaming": true,
-        "doppler_shift": true,
-        "light_travel_time": true,
-        "observerMotion": false
     }
 }

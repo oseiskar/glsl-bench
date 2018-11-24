@@ -55,12 +55,6 @@ def load_shader(json_path):
 
     source = shader_dir.read_file(json_data['source_path'])
 
-    template_params = json_data.get('mustache', None)
-    if template_params is not None:
-        import pystache
-        source = pystache.render(source, template_params)
-        #with open('out.glsl', 'w') as f: f.write(source)
-
     uniforms, mappings = get_uniform_values_and_mappings(json_data['uniforms'])
     shader = Shader(json_data['resolution'], source, uniforms)
 

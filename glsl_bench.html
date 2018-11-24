@@ -14,38 +14,8 @@
         <script src="js_libs/jquery-2.1.4.min.js"></script>
         <script src="js_libs/three.min.js"></script>
         <script src="js_libs/Detector.js"></script>
-        <script src="js_libs/mustache.min.js"></script>
-
-        <script id="vertex-shader" type="x-shader/x-vertex">
-            precision highp float;
-            precision highp int;
-
-            uniform mat4 modelMatrix;
-            uniform mat4 modelViewMatrix;
-            uniform mat4 projectionMatrix;
-            uniform mat4 viewMatrix;
-            uniform mat3 normalMatrix;
-            uniform vec3 cameraPosition;
-            attribute vec3 position;
-            attribute vec3 normal;
-            attribute vec2 uv;
-
-            varying vec3 pos;
-            void main() {
-                pos = position;
-                gl_Position = vec4( position, 1.0 );
-            }
-        </script>
-        <script id="copy-fragment-shader" type="x-shader/x-fragment">
-          uniform sampler2D source;
-          uniform vec2 resolution;
-          void main() {
-            gl_FragColor = texture2D(source, gl_FragCoord.xy / resolution.xy);
-          }
-        </script>
-        <script id="raw-fragment-shader-prefix" type="x-shader/x-fragment">
-          precision highp float;
-          precision highp int;
+        <script>
+          if (!Detector.webgl) Detector.addGetWebGLMessage();
         </script>
         <script src="glsl_bench.js"></script>
         <script src="build/tracer_data.js"></script>
