@@ -45,19 +45,25 @@
             runtimeShaderParams.batch_size = parseInt(params.batch_size);
           }
 
+          let benchOptions;
           const element = document.getElementById('shader-container');
           if (params.dynamicTracer) {
             const spec = dynamicTracers[params.dynamicTracer];
             for (let param in runtimeShaderParams) {
               spec[param] = runtimeShaderParams[param];
             }
-            new GLSLBench({ element, spec });
+            benchOptions = { element, spec };
           } else if (params.shader) {
-            new GLSLBench({ element, url: params.shader });
+            benchOptions = { element, url: params.shader };
+          } else {
+            throw new Error("Please define a shader JSON in the query string");
           }
-          else {
-            throw "Please define a shader JSON in the query string";
-          }
+
+          new GLSLBench(benchOptions)
+            .onError(err => {
+              throw new Error(`Shader failed: ${err}`);
+            });
+
         </script>
     </body>
 </html>

@@ -4,11 +4,26 @@
 
 function GLSLBench({element, url, spec}) {
 
+  let anyErrors = false;
+
+  let errorCallback = (errorText) => {
+    throw new Error(errorText);
+  };
+
+  function error(errorText) {
+    anyErrors = true;
+    errorCallback(errorText);
+  }
+
+  this.onError = function (callback) {
+    errorCallback = callback;
+  };
+
   let scene, camera, mesh, renderer, shader, frameBuffers, frameNumber;
   let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
 
   if (!element) {
-    throw new Error('Missing attribute: (DOM) element');
+    return error('Missing attribute: (DOM) element');
   }
   const container = element;
 
@@ -59,13 +74,17 @@ function GLSLBench({element, url, spec}) {
     getFile(url, onSuccess, onError) {
       const request = new XMLHttpRequest();
       request.onload = (x) => {
-        onSuccess(request.response);
+        if (request.status >= 400) {
+          request.onerror(request.statusText);
+        } else {
+          onSuccess(request.response);
+        }
       };
       if (onError) {
         request.onerror = onError;
       } else {
         request.onerror = () => {
-          throw new Error(`Failed to GET '${url}'`);
+          error(`Failed to GET '${url}'`);
         }
       }
       request.open("get", url, true);
@@ -73,7 +92,16 @@ function GLSLBench({element, url, spec}) {
     },
 
     getJSON(url, onSuccess, onError) {
-      helpers.getFile(url, data => onSuccess(JSON.parse(data)), onError);
+      helpers.getFile(url, data => {
+        let parsed;
+        try {
+          parsed = JSON.parse(data);
+        } catch (err) {
+          if (onError) return onError(err.message);
+          else return error(err.message);
+        }
+        onSuccess(parsed);
+      }, onError);
     },
 
     isString(x) {
@@ -116,7 +144,7 @@ function GLSLBench({element, url, spec}) {
         case 'normal':
           return randnBoxMuller();
         default:
-          throw new Error('invalid random distribution '+distribution);
+          return error('invalid random distribution '+distribution);
       }
     }
 
@@ -135,9 +163,10 @@ function GLSLBench({element, url, spec}) {
     this.params = shader_params;
 
     const checkLoaded = () => {
-        for (let key in textures) if (textures[key] === null) return;
-        if (this.source === null) return;
-        init();
+      if (anyErrors) return;
+      for (let key in textures) if (textures[key] === null) return;
+      if (this.source === null) return;
+      init();
     };
 
     const doStart = (shader_source) => {
@@ -151,7 +180,7 @@ function GLSLBench({element, url, spec}) {
     } else if (shader_params.source_path) {
         helpers.getFile(shader_folder + shader_params.source_path, doStart);
     } else {
-        throw new Error('No shader source code defined');
+        return error('No shader source code defined');
     }
 
     function buildFixed(value) {
@@ -258,7 +287,7 @@ function GLSLBench({element, url, spec}) {
                   return buildRandom(val);
                 }
                 else {
-                  throw "invalid uniform mapping " + val;
+                  throw new Error("invalid uniform mapping " + val);
                 }
         }
 
@@ -287,14 +316,18 @@ function GLSLBench({element, url, spec}) {
     for (let key in shader_params.uniforms) {
         const val = shader_params.uniforms[key];
 
-        if (helpers.isString(val)) {
-          const builder = buildDynamic(val);
-          bound_uniforms[key] = builder;
-          this.uniforms[key] = builder.declaration;
-        } else if (helpers.isObject(val)) {
-          loadTexture(key, shader_folder + val.file, THREE.NearestFilter);
-        } else {
-          this.uniforms[key] = buildFixed(val);
+        try {
+          if (helpers.isString(val)) {
+            const builder = buildDynamic(val);
+            bound_uniforms[key] = builder;
+            this.uniforms[key] = builder.declaration;
+          } else if (helpers.isObject(val)) {
+            loadTexture(key, shader_folder + val.file, THREE.NearestFilter);
+          } else {
+            this.uniforms[key] = buildFixed(val);
+          }
+        } catch (err) {
+          return error(err.message);
         }
     }
 
@@ -434,6 +467,9 @@ function GLSLBench({element, url, spec}) {
   }
 
   function render() {
+    // stop if errors have been encountered
+    if (anyErrors) return;
+
     shader.update();
 
     function tryRender(f) {
@@ -441,7 +477,7 @@ function GLSLBench({element, url, spec}) {
       if (shader.material.program.diagnostics) {
         console.log();
         shader.stop();
-        throw new Error(parseShaderError(shader.material.program.diagnostics, shader.material.program.code));
+        return error(parseShaderError(shader.material.program.diagnostics, shader.material.program.code));
       }
     }
 
@@ -487,7 +523,7 @@ function GLSLBench({element, url, spec}) {
     }
 
     if (url) {
-      if (spec) throw new Error("can't have both url and spec");
+      if (spec) return error("can't have both url and spec");
       shaderFolder = getFolderName(url);
       helpers.getJSON(url, doStart);
     } else {
