@@ -65,8 +65,7 @@ vec3 render(vec2 xy, vec2 resolution) {
     vec3 light_point, light_normal;
     float light_sample_area_probability;
     vec3 light_emission;
-    int light_object = select_light(light_point, light_normal, light_sample_area_probability,
-      rand_next_uniform(rng), rand_next_gauss3(rng));
+    int light_object = select_light(light_point, light_normal, light_sample_area_probability, rng);
 
     get_emission(light_object, light_emission);
 

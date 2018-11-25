@@ -1,11 +1,18 @@
 const tracerData = require('../../glsl/index.js');
 const autoName = require('../auto_tracer_name.js');
 const tracerCode = tracerData.surfaces['sphere.glsl'];
-const tracerName = autoName(tracerCode);
 
 function Sphere(radius) {
-  this.name = tracerName;
-  this.code = tracerCode;
+  this.tracer = {
+    name: autoName(tracerCode),
+    code: tracerCode
+  },
+  this.sampler = {
+    name: 'sphere',
+    samplerFunctionName: 'sphere_sample',
+    getAreaFunctionName: 'get_sphere_area',
+    code: tracerData.surfaces.samplers['sphere.glsl']
+  }
   this.parameters = [radius];
 }
 

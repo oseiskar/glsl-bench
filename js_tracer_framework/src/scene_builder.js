@@ -8,7 +8,13 @@ function SceneBuilder() {
   const deg2rad = (x) => x / 180.0 * Math.PI;
 
   this.addObject = (surface, position, material) => {
-    objects.push({tracer: surface, position, material});
+    objects.push({
+      tracer: surface.tracer,
+      sampler: surface.sampler,
+      parameters: surface.parameters,
+      position,
+      material
+    });
     return this;
   };
 
@@ -48,10 +54,13 @@ function SceneBuilder() {
 
   this.buildSceneGLSL = () => {
     const uniqueTracers = [];
+    const uniqueSamplers = [];
     const tracerNameSet = {};
+    const samplerNameSet = {};
     const objectViews = [];
     const uniqueMaterials = [];
     const objectsPerMaterial = {};
+    const objectsById = {};
 
     objects.forEach(obj => {
       const tracer = obj.tracer;
@@ -59,11 +68,19 @@ function SceneBuilder() {
         tracerNameSet[tracer.name] = true;
         uniqueTracers.push(tracer);
       }
+      const sampler = obj.sampler;
+      if (sampler && !samplerNameSet[sampler.name]) {
+        samplerNameSet[sampler.name] = true;
+        uniqueSamplers.push(sampler.code);
+      }
       const objectView = {
         obj,
         tracerName: tracer.name,
+        samplerName: sampler && sampler.samplerFunctionName,
+        getAreaName: sampler && sampler.getAreaFunctionName,
         posList: obj.position.join(','),
-        parameterListLeadingComma: ([''].concat(obj.tracer.parameters)).join(', ')
+        parameterListLeadingComma: ([''].concat(obj.parameters)).join(', '),
+        parameterList: obj.parameters.join(', ')
       };
       objectViews.push(objectView);
 
@@ -87,6 +104,7 @@ function SceneBuilder() {
           material.minObjectId = objectId;
         }
         material.maxObjectId = objectId;
+        objectsById[objectId] = objectView;
         objectId++;
       });
     });
@@ -131,19 +149,32 @@ function SceneBuilder() {
       }
     }
 
+    const emissionMaterials = buildGenericVec3Property('emission').materials;
+    const lights = [];
+    emissionMaterials.forEach(mat => {
+      for (let i = mat.minObjectId; i <= mat.maxObjectId; ++i) {
+        const obj = objectsById[i];
+        lights.push(objectsById[i]);
+      }
+    });
+
     return [
       Mustache.render(tracerData.templates['geometry.glsl.mustache'], {
         tracers: uniqueTracers,
         objects: objectViews
       }),
       Mustache.render(tracerData.templates['if_else_materials.glsl.mustache'], {
-        materialEmissions: buildGenericVec3Property('emission').materials,
+        materialEmissions: emissionMaterials,
         genericProperties: [
           buildGenericVec3Property('diffuse'),
           buildGenericScalarProperty('reflectivity'),
           buildGenericScalarProperty('transparency'),
           buildGenericScalarProperty('ior', defaultValue='1.0')
         ]
+      }),
+      Mustache.render(tracerData.templates['select_light.glsl.mustache'], {
+        lights,
+        uniqueSamplers
       }),
       cameraSource
     ].join('\n');
