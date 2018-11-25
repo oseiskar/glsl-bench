@@ -144,7 +144,9 @@ function SceneBuilder() {
           .map(mat => ({
             minObjectId: mat.minObjectId,
             maxObjectId: mat.maxObjectId,
-            value: mat.material[name]
+            // helps with integer values 1 != 1.0 == 1f == float(1)
+            // which cause errors in GLSL
+            value: `float(${mat.material[name]})`
           })))
       }
     }

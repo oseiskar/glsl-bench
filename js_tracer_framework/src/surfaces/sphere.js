@@ -13,7 +13,7 @@ function Sphere(radius) {
     getAreaFunctionName: 'get_sphere_area',
     code: tracerData.surfaces.samplers['sphere.glsl']
   }
-  this.parameters = [radius];
+  this.parameters = [`float(${radius})`]; // also works with integers
 }
 
 module.exports = Sphere;

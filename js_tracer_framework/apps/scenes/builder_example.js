@@ -23,8 +23,8 @@ const sceneSource = new SceneBuilder()
   })
   .addObject(new Sphere(0.5), [0.0, 0.0, 0.5], { diffuse: [.25, .4, .45] })
   .addObject(new Sphere(0.25), [-1.1, 0.3, 0.25], {
-    reflectivity: 0.05,
-    transparency: 0.9,
+    reflectivity: 0.1,
+    transparency: 1, // sampled after reflectivity
     ior: 1.5
   })
   .addObject(new Sphere(LIGHT_R), [-ROOM_W*0.5, 0.0, ROOM_H], {
@@ -60,8 +60,10 @@ module.exports = {
     ` }
   }),
   monte_carlo: true,
+  refresh_every: 20,
   uniforms: Object.assign({
     resolution: 'resolution',
+    base_image: 'previous_frame',
     frame_number: 'frame_number',
   }, randHelpers.fixedVecsRandUniforms)
 };
