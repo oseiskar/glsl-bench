@@ -10,7 +10,7 @@ module.exports = {
     },
     scene: { file: 'scene/moving_camera.glsl' },
     camera: { file: 'camera/pinhole.glsl' },
-    rand: { file: 'rand/fixed_vecs.glsl' },
+    rand: { file: 'rand/none.glsl' },
     parameters: { source: `
       #define ENABLE_TENT_FILTER 0
     `}

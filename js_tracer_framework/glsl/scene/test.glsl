@@ -69,7 +69,7 @@ int find_intersection(vec3 ray_pos, vec3 ray, int prev_object, int inside_object
     // The box interior is non-convex and can handle that.
     // "Inside" not supported here
     rel_pos = ray_pos - BOX_CENTER;
-    cur_isec = box_interior_intersection(rel_pos, ray, BOX_SIZE);
+    cur_isec = box_interior_intersection(rel_pos, ray, false, BOX_SIZE);
     if (cur_isec.w > 0.0 && (cur_isec.w < intersection.w || which_object == OBJ_NONE)) {
         intersection = cur_isec;
         which_object = OBJ_BOX;

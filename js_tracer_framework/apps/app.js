@@ -1,6 +1,7 @@
 const dynamicTracers = {
   test: require('./scenes/test.js'),
-  moving_camera: require('./scenes/moving_camera.js')
+  moving_camera: require('./scenes/moving_camera.js'),
+  builder_example: require('./scenes/builder_example.js')
 };
 
 const params = new URLSearchParams(window.location.search);
@@ -14,7 +15,11 @@ if (params.has('batch_size')) {
 }
 
 const element = document.getElementById('shader-container');
-const spec = dynamicTracers[params.get('tracer')];
+const appName = params.get('tracer')
+const spec = dynamicTracers[appName];
+if (!spec) {
+  throw new Error(`${appName} not found`);
+}
 for (let param in runtimeShaderParams) {
   spec[param] = runtimeShaderParams[param];
 }

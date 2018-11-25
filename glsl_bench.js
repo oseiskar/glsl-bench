@@ -483,6 +483,9 @@ function GLSLBench({element, url, spec}) {
     let shaderFolder = '/';
 
     function doStart(shaderParams) {
+      if (!shaderParams) {
+        error('missing shader spec!');
+      }
       shader = new Shader(shaderParams, shaderFolder);
     }
 

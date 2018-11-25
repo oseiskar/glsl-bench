@@ -8,7 +8,7 @@ function preprocess(mainFile, defines) {
     const v = defines[target];
     if (v.file) {
       paths[target] = v.file;
-    } else if (v.source) {
+    } else if (v.hasOwnProperty('source')) {
       overrides[target] = v.source;
     } else {
       throw new Error('no file nor source defined');
