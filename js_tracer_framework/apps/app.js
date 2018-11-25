@@ -1,4 +1,7 @@
-const dynamicTracers = require('./dynamic_tracers.js');
+const dynamicTracers = {
+  test: require('./scenes/test.js'),
+  moving_camera: require('./scenes/moving_camera.js')
+};
 
 const params = new URLSearchParams(window.location.search);
 const runtimeShaderParams = {};

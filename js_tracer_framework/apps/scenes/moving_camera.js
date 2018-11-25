@@ -1,4 +1,4 @@
-const preprocessor = require('../preprocess_helpers.js');
+const preprocessor = require('../../src/preprocess_helpers.js');
 
 module.exports = {
   resolution: [640, 480],

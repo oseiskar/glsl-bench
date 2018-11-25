@@ -1,4 +1,4 @@
-const tracerData = require('./tracer_data.js');
+const tracerData = require('../glsl/index.js');
 const preprocessFile = require('./preprocess_file.js');
 
 function preprocess(mainFile, defines) {

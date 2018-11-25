@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "./js_tracer_framework/build.sh && npm run browserify",
-    "browserify": "browserify -t brfs js_tracer_framework/app.js -o build/bundle.js",
-    "watch": "watchify -t brfs js_tracer_framework/app.js -o build/bundle.js"
+    "browserify": "browserify -t brfs js_tracer_framework/apps/app.js -o build/bundle.js",
+    "watch": "watchify -t brfs js_tracer_framework/apps/app.js -o build/bundle.js"
   }
 }
