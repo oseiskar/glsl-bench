@@ -11,7 +11,7 @@ functionality but runs locally.
 or
 
     python -m SimpleHTTPServer
-    # open: http://localhost:8000/glsl_bench.html?shader=examples/black-hole/black-hole.json
+    # open: http://localhost:8000/?shader=examples/black-hole/black-hole.json
 
 **Features**
 
@@ -19,4 +19,4 @@ or
  * Specifying textures in configuration files
  * Image output in raw float (`.npy`) and PNG formats
 
-**Dependencies**: `pygame`, `scipy`
+**Python dependencies**: `pygame`, `scipy`

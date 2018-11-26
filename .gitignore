@@ -1,12 +1,4 @@
 *.pyc
 *.png
 *.npy
-shader.html
 outputs/
-build/
-node_modules/
-
-js_tracer_framework/glsl/index.js
-
-# for now
-package-lock.json
