@@ -20,3 +20,6 @@ or
  * Image output in raw float (`.npy`) and PNG formats
 
 **Python dependencies**: `pygame`, `scipy`
+
+**JavaScript** version uses [TWGL](https://twgljs.org/), which included
+in `js_libs/` (distributed under the MIT license)
