@@ -1,6 +1,8 @@
 "use strict"
 /*global twgl, document, window, setTimeout, requestAnimationFrame:false */
 
+// quite sphagetti but gets the job done
+
 function GLSLBench({element, url, spec}) {
 
   let anyErrors = false;
@@ -32,6 +34,11 @@ function GLSLBench({element, url, spec}) {
 
   if (gl === null) {
     return error("Unable to initialize WebGL. Your browser or machine may not support it.");
+  }
+
+  this.destroy = function () {
+    if (shader) shader.stop();
+    if (canvas) canvas.parentNode.removeChild(canvas);
   }
 
   container.appendChild(canvas);
@@ -316,17 +323,6 @@ function GLSLBench({element, url, spec}) {
     return `Shader error: ${msg}`;
   }
 
-  function createRenderTarget(sizeX, sizeY) {
-    gl.getExtension('OES_texture_float');
-    return twgl.createFramebufferInfo(gl, [{
-      format: gl.RGBA,
-      type: gl.FLOAT,
-      min: gl.NEAREST,
-      mag: gl.NEAREST,
-      wrap: gl.CLAMP_TO_EDGE
-    }], sizeX, sizeY);
-  }
-
   const init = () => {
     this.fragmentShaderSource = RAW_FRAGMENT_SHADER_PREFIX + shader.source;
     const programInfo = twgl.createProgramInfo(gl, [
@@ -343,18 +339,31 @@ function GLSLBench({element, url, spec}) {
       RAW_FRAGMENT_SHADER_PREFIX + COPY_FRAGMENT_SHADER
     ], { errorCallback: error });
 
-  if (!programInfo || !copyProgramInfo) return;
+    if (!programInfo || !copyProgramInfo) return;
 
     const arrays = {
       position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0],
     };
     const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
 
+    function checkResize() {
+      const width = gl.canvas.clientWidth;
+      const height = gl.canvas.clientHeight;
+      if (gl.canvas.width != width ||
+          gl.canvas.height != height) {
+         gl.canvas.width = width;
+         gl.canvas.height = height;
+         onResize();
+      }
+    }
+
     render = () => {
       try {
+        checkResize();
+
         resolution = {
-          x: gl.canvas.width,
-          y: gl.canvas.height
+          x: gl.canvas.clientWidth,
+          y: gl.canvas.clientHeight
         };
 
         shader.update();
@@ -398,13 +407,14 @@ function GLSLBench({element, url, spec}) {
       }
     }
 
-    if (shader.params.resolution === 'auto') {
-      onWindowResize();
-    } else {
-      setSize(shader.params.resolution[0], shader.params.resolution[1]);
+    if (shader.params.resolution) {
+      canvas.width = shader.params.resolution[0];
+      canvas.height = shader.params.resolution[1];
     }
-    window.addEventListener( 'resize', onWindowResize, false );
 
+    onResize();
+
+    // TODO: canvas
     document.onmousemove = (e) => {
       const offset = helpers.offset(container);
       mouse_pos.x = e.pageX - container.offsetLeft;
@@ -416,41 +426,51 @@ function GLSLBench({element, url, spec}) {
     animate();
   }
 
-  function setSize(sizeX, sizeY) {
-    canvas.width = sizeX;
-    canvas.height = sizeY;
+  function onResize() {
+    const width = gl.drawingBufferWidth;
+    const height = gl.drawingBufferHeight;
 
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    //console.log(`resize ${width}x${height}`);
 
-    if (frameBuffers) frameBuffers.forEach(fb => gl.deleteFrameBuffer(fb.framebuffer));
+    // https://webglfundamentals.org/webgl/lessons/webgl-anti-patterns.html
+    gl.viewport(0, 0, width, height);
 
     // TODO rather undescriptive
     if (shader.params.monte_carlo || shader.params.float_buffers) {
-      // TODO: are these always zero or do they have to be initialized?
-      frameBuffers = [
-        createRenderTarget(sizeX, sizeY),
-        createRenderTarget(sizeX, sizeY)
-      ];
+      const attachments = [{
+        format: gl.RGBA,
+        type: gl.FLOAT,
+        min: gl.NEAREST,
+        mag: gl.NEAREST,
+        wrap: gl.CLAMP_TO_EDGE
+      }];
+
+      if (frameBuffers) {
+        frameBuffers.forEach(fb =>
+          twgl.resizeFramebufferInfo(gl, fb, attachments, width, height));
+      } else {
+        gl.getExtension('OES_texture_float');
+        // TODO: are these always zero or do they have to be initialized?
+        frameBuffers = [
+          twgl.createFramebufferInfo(gl, attachments, width, height),
+          twgl.createFramebufferInfo(gl, attachments, width, height)
+        ];
+      }
     }
     frameNumber = 0;
   }
 
-  function onWindowResize( event ) {
-    //console.log('window size changed');
-    if (shader.params.resolution === 'auto') {
-      setSize(window.innerWidth, window.innerHeight);
-    }
-  }
-
   function animate() {
     if (shader.params.monte_carlo) {
+      const minDelayMs = 1; // not with an absurd frame rate though
+
       // render as fast as possible
       const renderBatchSize = parseInt(shader.params.batch_size || 1);
       const timer = setInterval(() => {
         for (let i = 0; i < renderBatchSize; ++i) {
           render();
         }
-      }, 0);
+      }, minDelayMs);
       shader.stop = () => clearInterval(timer);
     } else {
       // capped frame rate
