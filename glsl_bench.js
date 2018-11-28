@@ -462,16 +462,21 @@ function GLSLBench({element, url, spec}) {
 
   function animate() {
     if (shader.params.monte_carlo) {
-      const minDelayMs = 1; // not with an absurd frame rate though
-
-      // render as fast as possible
+      // increase this to render as fast as possible
       const renderBatchSize = parseInt(shader.params.batch_size || 1);
-      const timer = setInterval(() => {
-        for (let i = 0; i < renderBatchSize; ++i) {
-          render();
-        }
-      }, minDelayMs);
-      shader.stop = () => clearInterval(timer);
+      const frameGapMs = 5;
+
+      let running = true;
+      function renderFrame() {
+        for (let i = 0; i < renderBatchSize; ++i) render();
+        if (running) setTimeout(renderFrame, frameGapMs);
+      }
+
+      setTimeout(renderFrame, 0);
+
+      shader.stop = () => {
+        running = false;
+      };
     } else {
       // capped frame rate
       const timer = requestAnimationFrame( animate );
