@@ -37,7 +37,7 @@ function GLSLBench({element, url, spec}) {
   }
 
   this.destroy = function () {
-    if (shader) shader.stop();
+    if (shader && shader.stop) shader.stop();
     if (canvas) canvas.parentNode.removeChild(canvas);
   }
 
