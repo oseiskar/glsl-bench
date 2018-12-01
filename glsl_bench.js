@@ -279,6 +279,19 @@ function GLSLBench({element, url, spec}) {
       });
     }
 
+    const loadTextureArray = (array, options = {}) => {
+      gl.getExtension('OES_texture_float');
+      return twgl.createTexture(gl, Object.assign({
+        src: array,
+        format: gl.RGBA,
+        type: gl.FLOAT,
+        mag: gl.NEAREST,
+        min: gl.NEAREST,
+        width: array.length/4,
+        height: 1
+      }, options));
+    }
+
     const bound_uniforms = {};
 
     for (let key in shader_params.uniforms) {
@@ -288,9 +301,29 @@ function GLSLBench({element, url, spec}) {
         if (helpers.isString(val)) {
           const builder = buildDynamic(val);
           bound_uniforms[key] = builder;
-          this.uniforms[key] = builder.declaration;
         } else if (helpers.isObject(val)) {
-          loadTexture(key, shader_folder + val.file);
+          if (val.file) {
+            loadTexture(key, shader_folder + val.file);
+          } else if (val.random) {
+            function generate() {
+              return new Float32Array(generateRandom(val.random.distribution, val.random.size*4));
+            }
+            const tex = loadTextureArray(generate());
+            this.uniforms[key] = tex;
+            bound_uniforms[key] = () => {
+              gl.bindTexture(gl.TEXTURE_2D, tex);
+              const level = 0;
+              const internalFormat = gl.RGBA;
+              const format = internalFormat;
+              const width = val.random.size;
+              const height = 1;
+              const type = gl.FLOAT;
+              gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, generate());
+              return tex;
+            }
+          } else {
+            throw new Error(`invalid uniform ${JSON.stringify(val)}`);
+          }
         } else {
           this.uniforms[key] = buildFixed(val);
         }

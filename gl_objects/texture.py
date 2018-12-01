@@ -20,12 +20,13 @@ class Texture:
             w = content.shape[1]
             h = content.shape[0]
 
-            if len(content.shape) > 1:
-                content = content[::-1,...] # y-axis is flipped?
-
         self.w = w
         self.h = h
         self._gl_handle = glGenTextures(1)
+
+        self.type = type
+        self.format = format
+        self.internal_format = internal_format
 
         with self.bind():
             glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_wrap);
@@ -33,7 +34,14 @@ class Texture:
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, interpolation)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, interpolation)
 
-            glTexImage2D(GL_TEXTURE_2D,0,internal_format,w,h,0,format,type,content)
+        if content is not None:
+            self.update(content)
+
+    def update(self, content):
+        assert(self.w == content.shape[1])
+        assert(self.h == content.shape[0])
+        with self.bind():
+            glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, self.w, self.h, 0, self.format,self.type, content)
 
     @contextmanager
     def bind(self):
@@ -53,5 +61,6 @@ class Texture:
         # drop alpha
         if data.shape[2] == 4: data = data[..., 0:3]
         data = data / 255.0
+        data = data[::-1,...] # y-axis is flipped?
 
         return Texture(content=data)

@@ -53,7 +53,10 @@ def load_shader(json_path):
     json_data = json.loads(read_file(json_path))
     shader_dir = DirChanger(json_path)
 
-    source = shader_dir.read_file(json_data['source_path'])
+    if 'source' in json_data:
+        source = json_data['source']
+    else:
+        source = shader_dir.read_file(json_data['source_path'])
 
     uniforms, mappings = get_uniform_values_and_mappings(json_data['uniforms'])
     shader = Shader(json_data['resolution'], source, uniforms)
@@ -65,6 +68,11 @@ def load_shader(json_path):
 
     return shader
 
+def genrate_random_array(distribution, size):
+    if distribution == 'gauss': distribution = 'normal'
+    func = getattr(numpy.random, distribution)
+    return func(size=size)
+
 def generate_random(command):
     parts = command.split('_')
 
@@ -72,15 +80,13 @@ def generate_random(command):
     assert(parts[0] == 'random')
 
     distribution = parts[1]
-    if distribution == 'gauss': distribution = 'normal'
 
     if len(parts) > 1:
         size = int(parts[2])
     else:
         size = 1
 
-    func = getattr(numpy.random, distribution)
-    return [func() for _ in xrange(size)]
+    return list(genrate_random_array(distribution, size))
 
 def main(args):
 
@@ -152,9 +158,19 @@ def main(args):
     for name in shader.uniform_mappings.keys()[::]:
         source = shader.uniform_mappings[name]
         if isinstance(source, dict):
-            # dict is texture
-            with shader.dir.as_working_dir():
-                shader.uniforms[name] = Texture.load(source['file'])
+            if 'random' in source:
+                n = source['random']['size']
+                shader.uniforms[name] = Texture(
+                    w = n*4,
+                    h = 1,
+                    internal_format = GL_RGBA32F,
+                    type = GL_FLOAT,
+                    content = numpy.zeros((1,n*4,4)))
+                continue # updated on each frame
+            else:
+                # dict is texture
+                with shader.dir.as_working_dir():
+                    shader.uniforms[name] = Texture.load(source['file'])
         elif source == 'resolution':
             shader.uniforms[name] = map(float, shader.resolution)
         else:
@@ -184,7 +200,12 @@ def main(args):
             with framebuffer.render_to_texture(textures[1]):
 
                 for name, source in shader.uniform_mappings.items():
-                    if source == 'time':
+                    if isinstance(source, dict):
+                        r = source['random']
+                        tex = shader.uniforms[name]
+                        tex.update(genrate_random_array(r['distribution'], (tex.h, tex.w, 4)))
+                        continue # no need to use with set_uniforms
+                    elif source == 'time':
                         value = time.time() - t0
                     elif source == 'previous_frame':
                         value = textures[0]
