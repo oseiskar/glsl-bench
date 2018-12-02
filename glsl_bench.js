@@ -36,8 +36,12 @@ function GLSLBench({element, url, spec}) {
     return error("Unable to initialize WebGL. Your browser or machine may not support it.");
   }
 
-  this.destroy = function () {
+  this.stop = function () {
     if (shader && shader.stop) shader.stop();
+  }
+
+  this.destroy = function () {
+    this.stop();
     if (canvas) canvas.parentNode.removeChild(canvas);
   }
 
@@ -311,7 +315,10 @@ function GLSLBench({element, url, spec}) {
           if (val.file) {
             loadTexture(key, shader_folder + val.file);
           } else if (val.data) {
-            this.uniforms[key] = loadTextureArray(val.data);
+            this.uniforms[key] = loadTextureArray(val.data, {
+              width: val.data[0].length,
+              height: val.length
+            });
           } else if (val.random) {
             function generate() {
               return new Float32Array(generateRandom(val.random.distribution, val.random.size*4));
