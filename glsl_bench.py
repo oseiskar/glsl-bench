@@ -158,17 +158,27 @@ def main(args):
     for name in shader.uniform_mappings.keys()[::]:
         source = shader.uniform_mappings[name]
         if isinstance(source, dict):
+            def data_texture(**kwargs):
+                return Texture(
+                    internal_format = GL_RGBA32F,
+                    interpolation=GL_NEAREST,
+                    format = GL_RGBA,
+                    texture_wrap=GL_CLAMP_TO_EDGE,
+                    type = GL_FLOAT,
+                    **kwargs)
+
             if 'random' in source:
                 n = source['random']['size']
-                shader.uniforms[name] = Texture(
+                shader.uniforms[name] = data_texture(
                     w = n*4,
                     h = 1,
-                    internal_format = GL_RGBA32F,
-                    type = GL_FLOAT,
                     content = numpy.zeros((1,n*4,4)))
                 continue # updated on each frame
+            elif 'data' in source:
+                data = numpy.array(source['data'])
+                shader.uniforms[name] = data_texture(content = data)
             else:
-                # dict is texture
+                # dict is texture file name
                 with shader.dir.as_working_dir():
                     shader.uniforms[name] = Texture.load(source['file'])
         elif source == 'resolution':

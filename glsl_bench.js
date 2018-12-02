@@ -280,6 +280,10 @@ function GLSLBench({element, url, spec}) {
     }
 
     const loadTextureArray = (array, options = {}) => {
+      // flatten
+      while (array[0].length > 1) array = array.reduce((a,b) => a.concat(b));
+      array = new Float32Array(array);
+
       gl.getExtension('OES_texture_float');
       return twgl.createTexture(gl, Object.assign({
         src: array,
@@ -287,8 +291,10 @@ function GLSLBench({element, url, spec}) {
         type: gl.FLOAT,
         mag: gl.NEAREST,
         min: gl.NEAREST,
+        wrap: gl.CLAMP_TO_EDGE,
         width: array.length/4,
-        height: 1
+        height: 1,
+        auto: false
       }, options));
     }
 
@@ -304,6 +310,8 @@ function GLSLBench({element, url, spec}) {
         } else if (helpers.isObject(val)) {
           if (val.file) {
             loadTexture(key, shader_folder + val.file);
+          } else if (val.data) {
+            this.uniforms[key] = loadTextureArray(val.data);
           } else if (val.random) {
             function generate() {
               return new Float32Array(generateRandom(val.random.distribution, val.random.size*4));
