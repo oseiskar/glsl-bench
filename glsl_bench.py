@@ -1,5 +1,5 @@
 
-import os
+import os, time
 from contextlib import contextmanager
 
 from gl_objects import Shader
@@ -11,6 +11,7 @@ def parse_command_line_arguments():
     arg_parser.add_argument('-np', '--numpy_output_file')
     arg_parser.add_argument('-png', '--png_output_file', default='out.png')
     arg_parser.add_argument('-res', '--preview_resolution')
+    arg_parser.add_argument('-s', '--sleep', type=float, default=0.0)
 
     arg_parser.add_argument('shader_file')
     return arg_parser.parse_args()
@@ -246,6 +247,9 @@ def main(args):
 
         # flip buffers
         textures = textures[::-1]
+
+        if args.sleep > 0.0:
+            time.sleep(args.sleep)
 
 if __name__ == '__main__':
 
