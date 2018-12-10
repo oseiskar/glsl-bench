@@ -449,7 +449,6 @@ function GLSLBench({element, url, spec}) {
         }
         frameNumber++;
 
-        twgl.drawBufferInfo(gl, bufferInfo);
       } catch (err) {
         error(err.message);
       }
