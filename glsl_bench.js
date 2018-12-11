@@ -405,8 +405,10 @@ function GLSLBench({element, url, spec}) {
       }
     }
 
-    render = () => {
+    render = (division = 0, nDivisions = 1) => {
       try {
+        const firstDivision = division === 0;
+        const lastDivision = division === nDivisions - 1;
         checkResize();
 
         resolution = {
@@ -414,8 +416,10 @@ function GLSLBench({element, url, spec}) {
           y: gl.canvas.clientHeight
         };
 
-        shader.update();
-        if (anyErrors) return;
+        if (firstDivision) {
+          shader.update();
+          if (anyErrors) return;
+        }
 
         gl.useProgram(programInfo.program);
         twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
@@ -430,12 +434,22 @@ function GLSLBench({element, url, spec}) {
           const currentTarget = frameBuffers[frameNumber % 2];
 
           twgl.bindFramebufferInfo(gl, currentTarget);
-          twgl.drawBufferInfo(gl, bufferInfo);
+
+          if (nDivisions > 1) {
+            const rowsBegin = Math.floor(division / nDivisions * resolution.y);
+            const rowsEnd = Math.floor((division + 1) / nDivisions * resolution.y);
+            gl.enable(gl.SCISSOR_TEST);
+            gl.scissor(0, rowsBegin, resolution.x, rowsEnd-rowsBegin);
+            twgl.drawBufferInfo(gl, bufferInfo);
+            gl.disable(gl.SCISSOR_TEST);
+          } else {
+            twgl.drawBufferInfo(gl, bufferInfo);
+          }
 
           // renderer.render( scene, camera, currentTarget );
 
           const refreshEvery = parseInt(shader.params.refresh_every || 1);
-          if (frameNumber % refreshEvery === 0) {
+          if (lastDivision && frameNumber % refreshEvery === 0) {
             gl.useProgram(copyProgramInfo.program);
             twgl.bindFramebufferInfo(gl, null);
             twgl.setBuffersAndAttributes(gl, copyProgramInfo, bufferInfo);
@@ -447,7 +461,7 @@ function GLSLBench({element, url, spec}) {
             twgl.drawBufferInfo(gl, bufferInfo);
           }
         }
-        frameNumber++;
+        if (lastDivision) frameNumber++;
 
       } catch (err) {
         error(err.message);
@@ -507,15 +521,65 @@ function GLSLBench({element, url, spec}) {
     frameNumber = 0;
   }
 
+  function RenderingAutoPartitioner(initialDivisions) {
+      const targetBlockTimeMs = 50;
+      const maxDivisions = 20;
+      let changesLeft = 100; // maximum number of adjustments
+      let nDivisions = initialDivisions;
+      let t0;
+
+      this.adjustedNumberOfDivisions = () => {
+        const t1 = new Date();
+        if (t0) {
+          const blockTime = (t1 - t0) / nDivisions;
+
+          if (blockTime < targetBlockTimeMs) {
+            if (nDivisions > 1 && changesLeft > 0) {
+              nDivisions--;
+              changesLeft--;
+              console.log(`blocked for ${blockTime}ms, reduced number of divisions to ${nDivisions}`);
+            }
+          } else {
+            if (nDivisions >= 1 && nDivisions < maxDivisions && changesLeft > 0) {
+              nDivisions++;
+              changesLeft--;
+              console.log(`blocked for ${blockTime}ms, increased the number of divisions to ${nDivisions}`);
+            }
+          }
+        }
+        t0 = t1;
+        return nDivisions;
+      }
+  }
+
   function animate() {
     if (shader.params.monte_carlo) {
       // increase this to render as fast as possible
-      const renderBatchSize = parseInt(shader.params.batch_size || 1);
-      const frameGapMs = 5;
+      const frameGapMs = 1;
 
       let running = true;
+      let nDivisions = 1;
+      let renderBatchSize;
+      let autoPartitioner;
+
+      if (!shader.params.batch_size) {
+        nDivisions = 10;
+        autoPartitioner = new RenderingAutoPartitioner(nDivisions);
+        renderBatchSize = 1;
+      } else {
+        renderBatchSize = shader.params.batch_size;
+      }
+
+      let curDivision = 0;
       function renderFrame() {
-        for (let i = 0; i < renderBatchSize; ++i) render();
+        if (curDivision === 0 && autoPartitioner) {
+          nDivisions = autoPartitioner.adjustedNumberOfDivisions();
+          shader.params.refresh_every = nDivisions === 1 ? 5 : 1;
+        }
+        for (let i = 0; i < renderBatchSize; ++i) {
+          render(curDivision, nDivisions);
+          curDivision = (curDivision + 1) % nDivisions;
+        }
         if (running) setTimeout(renderFrame, frameGapMs);
       }
 
@@ -528,8 +592,8 @@ function GLSLBench({element, url, spec}) {
       // capped frame rate
       const timer = requestAnimationFrame( animate );
       shader.stop = () => cancelAnimationFrame(timer);
+      render();
     }
-    render();
   }
 
   const getFrameDuration = (() => {
