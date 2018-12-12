@@ -521,59 +521,93 @@ function GLSLBench({element, url, spec}) {
     frameNumber = 0;
   }
 
-  function RenderingAutoPartitioner(initialDivisions) {
-      const targetBlockTimeMs = 50;
-      const maxDivisions = 20;
-      let changesLeft = 100; // maximum number of adjustments
-      let nDivisions = initialDivisions;
+  function RenderingAutoPartitioner() {
+      const targetBlockTimeMs = 30 + 10;
+      const maxDivisions = 40;
+      const maxFrameGap = 30;
+      const adjustmentBatchSize = 4;
+      let frameGapMs = maxFrameGap;
+      let changesLeft = 30; // maximum number of adjustments
+      let nDivisions = 5;
       let t0;
+      let batchNumber = 0;
+      let batchTimes = [];
+      let wasDecreased = false;
 
-      this.adjustedNumberOfDivisions = () => {
+      function increaseWork() {
+        if (nDivisions > 1) {
+          if (wasDecreased) nDivisions--;
+          else nDivisions = Math.round(nDivisions / 3);
+          console.log(`reduced number of divisions to ${nDivisions}`);
+        } else if (frameGapMs > 0) {
+          frameGapMs = Math.floor(frameGapMs / 2);
+          console.log(`reduced frame gap to ${frameGapMs}ms`);
+        }
+      }
+
+      function decreaseWork() {
+        wasDecreased = true;
+        if (nDivisions === 1 && frameGapMs < maxFrameGap) {
+          frameGapMs = Math.max(1, Math.min(frameGapMs * 2, maxFrameGap));
+          console.log(`increased frame gap to ${frameGapMs}ms`);
+        }
+        else if (nDivisions < maxDivisions) {
+          nDivisions += 2;
+          console.log(`increased the number of divisions to ${nDivisions}`);
+        }
+      }
+
+      this.adjustProperties = () => {
         const t1 = new Date();
-        if (t0) {
-          const blockTime = (t1 - t0) / nDivisions;
+        if (t0 && changesLeft > 0) {
+          const deltaT = t1 - t0;
+          batchTimes.push(deltaT);
+          if (batchNumber++ % adjustmentBatchSize === 0) {
+            const n = batchTimes.length;
+            const mean = batchTimes.reduce((a,b) => a + b) / n;
+            const v = batchTimes.map(x => (x-mean)*(x-mean))
+              .reduce((a,b) => a + b) / n; // +1 no-one cares
+            const metric = (mean + v) / nDivisions;
+            const target = frameGapMs + 20;
 
-          if (blockTime < targetBlockTimeMs) {
-            if (nDivisions > 1 && changesLeft > 0) {
-              nDivisions--;
-              changesLeft--;
-              console.log(`blocked for ${blockTime}ms, reduced number of divisions to ${nDivisions}`);
+            console.log(`metric ${metric} target ${target}`);
+
+            if (metric < target) increaseWork();
+            else decreaseWork();
+            changesLeft--;
+            if (changesLeft === 0) {
+              // keep on the easy side to avoid cranking GPU load
+              // to near 100% in the browser (even if still responsive)
+              decreaseWork();
             }
-          } else {
-            if (nDivisions >= 1 && nDivisions < maxDivisions && changesLeft > 0) {
-              nDivisions++;
-              changesLeft--;
-              console.log(`blocked for ${blockTime}ms, increased the number of divisions to ${nDivisions}`);
-            }
+
+            batchTimes = [];
           }
         }
         t0 = t1;
-        return nDivisions;
+        return { nDivisions, frameGapMs };
       }
   }
 
   function animate() {
     if (shader.params.monte_carlo) {
-      // increase this to render as fast as possible
-      const frameGapMs = 1;
 
       let running = true;
-      let nDivisions = 1;
       let renderBatchSize;
-      let autoPartitioner;
+      let autoPartitioner = new RenderingAutoPartitioner();
+      let { frameGapMs, nDivisions } = autoPartitioner.adjustProperties();
 
       if (!shader.params.batch_size) {
-        nDivisions = 10;
-        autoPartitioner = new RenderingAutoPartitioner(nDivisions);
         renderBatchSize = 1;
       } else {
         renderBatchSize = shader.params.batch_size;
+        autoPartitioner = null;
       }
 
       let curDivision = 0;
       function renderFrame() {
         if (curDivision === 0 && autoPartitioner) {
-          nDivisions = autoPartitioner.adjustedNumberOfDivisions();
+          ({ nDivisions, frameGapMs } = autoPartitioner.adjustProperties());
           shader.params.refresh_every = nDivisions === 1 ? 5 : 1;
         }
         for (let i = 0; i < renderBatchSize; ++i) {
@@ -595,16 +629,6 @@ function GLSLBench({element, url, spec}) {
       render();
     }
   }
-
-  const getFrameDuration = (() => {
-    let lastTimestamp = new Date().getTime();
-    return () => {
-        const timestamp = new Date().getTime();
-        const diff = (timestamp - lastTimestamp) / 1000.0;
-        lastTimestamp = timestamp;
-        return diff;
-    };
-  })();
 
   function startShader({url, spec}) {
     function getFolderName(str) {
