@@ -521,72 +521,81 @@ function GLSLBench({element, url, spec}) {
     frameNumber = 0;
   }
 
+  // Tries to learn suitable rendering workload parameters for the GPU and
+  // scene to keep the page responsive. As of 2018, cranking the load too high
+  // is a frightenigly easy way to bring entire desktop or phone UI running
+  // this into a griding halt
   function RenderingAutoPartitioner() {
-      const targetBlockTimeMs = 30 + 10;
-      const maxDivisions = 40;
-      const maxFrameGap = 30;
-      const adjustmentBatchSize = 4;
-      let frameGapMs = maxFrameGap;
-      let changesLeft = 30; // maximum number of adjustments
-      let nDivisions = 5;
-      let t0;
-      let batchNumber = 0;
-      let batchTimes = [];
-      let wasDecreased = false;
+    const targetBlockTimeMs = 30 + 10;
+    const maxDivisions = 20;
+    const maxFrameGap = 30;
+    const adjustmentBatchSize = 4;
+    let frameGapMs = maxFrameGap;
+    let changesLeft = 30; // maximum number of adjustments
+    let nDivisions = 5;
+    let wasDecreased = false;
 
-      function increaseWork() {
-        if (nDivisions > 1) {
-          if (wasDecreased) nDivisions--;
-          else nDivisions = Math.round(nDivisions / 3);
-          console.log(`reduced number of divisions to ${nDivisions}`);
-        } else if (frameGapMs > 0) {
-          frameGapMs = Math.floor(frameGapMs / 2);
-          console.log(`reduced frame gap to ${frameGapMs}ms`);
-        }
+    function increaseWork() {
+      //if (nDivisions < 5) { changesLeft = 0; return; }
+      if (nDivisions > 1) {
+        if (wasDecreased) nDivisions--;
+        else nDivisions = Math.round(nDivisions / 3);
+        console.log(`reduced number of divisions to ${nDivisions}`);
+      } else if (frameGapMs > 0) {
+        frameGapMs = Math.floor(frameGapMs / 2);
+        console.log(`reduced frame gap to ${frameGapMs}ms`);
       }
+    }
 
-      function decreaseWork() {
-        wasDecreased = true;
-        if (nDivisions === 1 && frameGapMs < maxFrameGap) {
-          frameGapMs = Math.max(1, Math.min(frameGapMs * 2, maxFrameGap));
-          console.log(`increased frame gap to ${frameGapMs}ms`);
-        }
-        else if (nDivisions < maxDivisions) {
-          nDivisions += 2;
-          console.log(`increased the number of divisions to ${nDivisions}`);
-        }
+    function decreaseWork() {
+      wasDecreased = true;
+      if (nDivisions === 1 && frameGapMs < maxFrameGap) {
+        frameGapMs = Math.max(1, Math.min(frameGapMs * 2, maxFrameGap));
+        console.log(`increased frame gap to ${frameGapMs}ms`);
       }
+      else if (nDivisions < maxDivisions) {
+        nDivisions += 2;
+        console.log(`increased the number of divisions to ${nDivisions}`);
+      }
+    }
 
-      this.adjustProperties = () => {
-        const t1 = new Date();
-        if (t0 && changesLeft > 0) {
-          const deltaT = t1 - t0;
-          batchTimes.push(deltaT);
-          if (batchNumber++ % adjustmentBatchSize === 0) {
-            const n = batchTimes.length;
-            const mean = batchTimes.reduce((a,b) => a + b) / n;
-            const v = batchTimes.map(x => (x-mean)*(x-mean))
-              .reduce((a,b) => a + b) / n; // +1 no-one cares
-            const metric = (mean + v) / nDivisions;
-            const target = frameGapMs + 20;
+    let t0;
+    let batchNumber = 0;
+    let frameTimes = [];
 
-            console.log(`metric ${metric} target ${target}`);
+    this.recordFrame = () => {
+      if (!changesLeft) return;
+      const t1 = Date.now();
+      if (t0) {
+        const dt = t1 - t0;
+        frameTimes.push(dt);
+        if (dt > 100) console.log(`${dt} !!!`);
+      }
+      t0 =  t1;
+    }
 
-            if (metric < target) increaseWork();
+    this.adjustProperties = () => {
+      batchNumber++;
+      if (frameTimes.length > 0 && changesLeft > 0) {
+        const maxTime = frameTimes.reduce((a,b) => Math.max(a,b));
+        const target = frameGapMs * 1.5 + 15;
+        if (maxTime > target || batchNumber % adjustmentBatchSize === 0) {
+          console.log(`metric ${maxTime}ms target ${target}`);
+
+          if (changesLeft > 0) {
+            if (maxTime < target) increaseWork();
             else decreaseWork();
             changesLeft--;
             if (changesLeft === 0) {
-              // keep on the easy side to avoid cranking GPU load
-              // to near 100% in the browser (even if still responsive)
+              // keep on the easy side
               decreaseWork();
             }
-
-            batchTimes = [];
           }
+          frameTimes = [];
         }
-        t0 = t1;
-        return { nDivisions, frameGapMs };
       }
+      return { nDivisions, frameGapMs };
+    }
   }
 
   function animate() {
@@ -606,15 +615,30 @@ function GLSLBench({element, url, spec}) {
 
       let curDivision = 0;
       function renderFrame() {
-        if (curDivision === 0 && autoPartitioner) {
-          ({ nDivisions, frameGapMs } = autoPartitioner.adjustProperties());
-          shader.params.refresh_every = nDivisions === 1 ? 5 : 1;
+        if (!running) return;
+
+        if (autoPartitioner) {
+          autoPartitioner.recordFrame();
+          if (curDivision === 0) {
+            ({ nDivisions, frameGapMs } = autoPartitioner.adjustProperties());
+            shader.params.refresh_every = nDivisions === 1 ? 5 : 1;
+          }
         }
         for (let i = 0; i < renderBatchSize; ++i) {
           render(curDivision, nDivisions);
           curDivision = (curDivision + 1) % nDivisions;
         }
-        if (running) setTimeout(renderFrame, frameGapMs);
+
+        if (frameGapMs > 1) {
+          setTimeout(() => {
+            if (running) requestAnimationFrame(renderFrame);
+          }, frameGapMs);
+        } else {
+          // with small frame gap, render at maximum speed by dropping
+          // requestAnimationFrame, which has a high risk of freezing the
+          // UI if the GPU cannot keep up
+          setTimeout(renderFrame, frameGapMs);
+        }
       }
 
       setTimeout(renderFrame, 0);
