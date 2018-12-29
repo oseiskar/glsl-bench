@@ -1,10 +1,11 @@
-"use strict"
-/*global twgl, document, window, setTimeout, requestAnimationFrame:false */
+
+/* global twgl, document, setTimeout, requestAnimationFrame, cancelAnimationFrame, XMLHttpRequest */
+
+/* eslint-disable prefer-destructuring, no-use-before-define */
 
 // quite sphagetti but gets the job done
-
-function GLSLBench({element, url, spec}) {
-
+// eslint-disable-next-line no-unused-vars
+function GLSLBench({ element, url, spec }) {
   let anyErrors = false;
 
   let errorCallback = (errorText) => {
@@ -16,12 +17,19 @@ function GLSLBench({element, url, spec}) {
     errorCallback(errorText);
   }
 
-  this.onError = function (callback) {
+  this.onError = (callback) => {
     errorCallback = callback;
   };
 
-  let render, shader, frameBuffers, frameNumber, resolution;
-  let mouse_pos = { x: 0, y: 0, rel_x: 0, rel_y: 0 };
+  let render;
+  let shader;
+  let frameBuffers;
+  let frameNumber;
+  let resolution;
+
+  const mousePos = {
+    x: 0, y: 0, rel_x: 0, rel_y: 0
+  };
 
   if (!element) {
     return error('Missing attribute: (DOM) element');
@@ -30,20 +38,20 @@ function GLSLBench({element, url, spec}) {
   // try to initialize WebGL
   const container = element;
   const canvas = document.createElement('canvas');
-  const gl = canvas.getContext("webgl");
+  const gl = canvas.getContext('webgl');
 
   if (gl === null) {
-    return error("Unable to initialize WebGL. Your browser or machine may not support it.");
+    return error('Unable to initialize WebGL. Your browser or machine may not support it.');
   }
 
-  this.stop = function () {
+  this.stop = () => {
     if (shader && shader.stop) shader.stop();
-  }
+  };
 
-  this.destroy = function () {
+  this.destroy = () => {
     this.stop();
     if (canvas) canvas.parentNode.removeChild(canvas);
-  }
+  };
 
   container.appendChild(canvas);
 
@@ -59,10 +67,10 @@ function GLSLBench({element, url, spec}) {
   }
   `;
 
-  const RAW_FRAGMENT_SHADER_PREFIX = [
-    "precision highp float;",
-    "precision highp int;"
-  ].join("\n") + "\n";
+  const RAW_FRAGMENT_SHADER_PREFIX = `${[
+    'precision highp float;',
+    'precision highp int;'
+  ].join('\n')}\n`;
 
   const COPY_FRAGMENT_SHADER = `
   uniform sampler2D source;
@@ -74,9 +82,9 @@ function GLSLBench({element, url, spec}) {
 
   // simple jQuery replacements
   const helpers = {
-    getFile(url, onSuccess, onError) {
+    getFile(fileUrl, onSuccess, onError) {
       const request = new XMLHttpRequest();
-      request.onload = (x) => {
+      request.onload = () => {
         if (request.status >= 400) {
           request.onerror(request.statusText);
         } else {
@@ -87,29 +95,29 @@ function GLSLBench({element, url, spec}) {
         request.onerror = onError;
       } else {
         request.onerror = () => {
-          error(`Failed to GET '${url}'`);
-        }
+          error(`Failed to GET '${fileUrl}'`);
+        };
       }
-      request.open("get", url, true);
+      request.open('get', fileUrl, true);
       request.send();
     },
 
-    getJSON(url, onSuccess, onError) {
-      helpers.getFile(url, data => {
+    getJSON(jsonUrl, onSuccess, onError) {
+      helpers.getFile(jsonUrl, (data) => {
         let parsed;
         try {
           parsed = JSON.parse(data);
         } catch (err) {
           if (onError) return onError(err.message);
-          else return error(err.message);
+          return error(err.message);
         }
-        onSuccess(parsed);
+        return onSuccess(parsed);
       }, onError);
     },
 
     isString(x) {
       // https://stackoverflow.com/a/17772086/1426569
-      return Object.prototype.toString.call(x) === "[object String]";
+      return Object.prototype.toString.call(x) === '[object String]';
     },
 
     isObject(x) {
@@ -124,20 +132,20 @@ function GLSLBench({element, url, spec}) {
         left: rect.left + document.body.scrollLeft
       };
     }
-  }
+  };
 
   function generateRandom(distribution, size) {
-
     // TODO: Math.random is of low quality on older browsers
     // but Xorshift128+ on newer
 
     // from https://stackoverflow.com/a/36481059/1426569
     // Standard Normal variate using Box-Muller transform
     function randnBoxMuller() {
-      var u = 0, v = 0;
-      while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
-      while(v === 0) v = Math.random();
-      return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+      let u = 0; let
+        v = 0;
+      while (u === 0) u = Math.random(); // Converting [0,1) to (0,1)
+      while (v === 0) v = Math.random();
+      return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
     }
 
     const generate = () => {
@@ -147,51 +155,49 @@ function GLSLBench({element, url, spec}) {
         case 'normal':
           return randnBoxMuller();
         default:
-          return error('invalid random distribution '+distribution);
+          return error(`invalid random distribution ${distribution}`);
       }
-    }
+    };
 
     const sample = [];
-    for (let i=0; i<size; ++i) {
+    for (let i = 0; i < size; ++i) {
       sample.push(generate());
     }
     return sample;
   }
 
-  function Shader(shader_params, shader_folder) {
-
+  function Shader(shaderParams, shaderFolder) {
     const time0 = new Date().getTime();
     const textures = {};
     this.source = null;
-    this.params = shader_params;
+    this.params = shaderParams;
 
     const checkLoaded = () => {
       if (anyErrors) return;
-      for (let key in textures) if (textures[key] === null) return;
+      if (Object.values(textures).filter(x => x === null).length > 0) return;
       if (this.source === null) return;
       init();
     };
 
-    const doStart = (shader_source) => {
-        //console.log(shader_source);
-        this.source = shader_source;
-        checkLoaded();
+    const doStart = (shaderSource) => {
+      // console.log(shaderSource);
+      this.source = shaderSource;
+      checkLoaded();
     };
 
-    if (shader_params.source) {
-        setTimeout(() => doStart(shader_params.source), 0);
-    } else if (shader_params.source_path) {
-        helpers.getFile(shader_folder + shader_params.source_path, doStart);
+    if (shaderParams.source) {
+      setTimeout(() => doStart(shaderParams.source), 0);
+    } else if (shaderParams.source_path) {
+      helpers.getFile(shaderFolder + shaderParams.source_path, doStart);
     } else {
-        return error('No shader source code defined');
+      return error('No shader source code defined');
     }
 
     function buildFixed(value) {
       if (Array.isArray(value)) {
         return new Float32Array(value);
-      } else {
-        return value;
       }
+      return value;
     }
 
     function buildRandom(val) {
@@ -203,53 +209,37 @@ function GLSLBench({element, url, spec}) {
       if (parts.length > 2) {
         size = parts[2];
         if (parts.length > 3 || size > 4) {
-          throw new Error('invalid random '+val);
+          throw new Error(`invalid random ${val}`);
         }
       }
 
       if (size > 1) {
-        return () => {
-          return new Float32Array(generateRandom(distribution, size));
-        };
-      } else {
-        return () => {
-          return generateRandom(distribution, 1)[0];
-        };
+        return () => new Float32Array(generateRandom(distribution, size));
       }
+      return () => generateRandom(distribution, 1)[0];
     }
 
     function buildDynamic(val) {
-      switch(val) {
+      switch (val) {
         case 'time':
-          return (v) => {
-            return (new Date().getTime() - time0) / 1000.0;
-          };
+          return () => (new Date().getTime() - time0) / 1000.0;
         case 'resolution':
-          return () => {
-            return new Float32Array([
-              resolution.x,
-              resolution.y
-            ]);
-          };
+          return () => new Float32Array([
+            resolution.x,
+            resolution.y
+          ]);
         case 'mouse':
-          return () => {
-            return new Float32Array([
-              mouse_pos.x,
-              mouse_pos.y
-            ]);
-          };
+          return () => new Float32Array([
+            mousePos.x,
+            mousePos.y
+          ]);
         case 'relative_mouse':
-          return () => {
-            return new Float32Array([
-              mouse_pos.rel_x,
-              mouse_pos.rel_y
-            ]);
-          };
+          return () => new Float32Array([
+            mousePos.rel_x,
+            mousePos.rel_y
+          ]);
         case 'frame_number':
-          return () => {
-            return frameNumber;
-          };
-          break;
+          return () => frameNumber;
         case 'previous_frame':
           return () => {
             const curBuffer = frameNumber % 2;
@@ -259,9 +249,8 @@ function GLSLBench({element, url, spec}) {
           if (val.startsWith('random_')) {
             return buildRandom(val);
           }
-          else {
-            throw new Error("invalid uniform mapping " + val);
-          }
+
+          throw new Error(`invalid uniform mapping ${val}`);
       }
     }
 
@@ -273,19 +262,20 @@ function GLSLBench({element, url, spec}) {
         src: filename,
         mag: gl.NEAREST,
         min: gl.NEAREST
-      }, options), (err, tex, source) => {
+      }, options), (err, tex) => {
         if (err) {
           return error(err);
         }
         textures[symbol] = tex;
         this.uniforms[symbol] = tex;
-        checkLoaded();
+        return checkLoaded();
       });
-    }
+    };
 
-    const loadTextureArray = (array, options = {}) => {
+    const loadTextureArray = (textureArray, options = {}) => {
+      let array = [...textureArray];
       // flatten
-      while (array[0].length > 1) array = array.reduce((a,b) => a.concat(b));
+      while (array[0].length > 1) array = array.reduce((a, b) => a.concat(b));
       array = new Float32Array(array);
 
       gl.getExtension('OES_texture_float');
@@ -296,46 +286,47 @@ function GLSLBench({element, url, spec}) {
         mag: gl.NEAREST,
         min: gl.NEAREST,
         wrap: gl.CLAMP_TO_EDGE,
-        width: array.length/4,
+        width: array.length / 4,
         height: 1,
         auto: false
       }, options));
-    }
+    };
 
-    const bound_uniforms = {};
+    const boundUniforms = {};
 
-    for (let key in shader_params.uniforms) {
-      const val = shader_params.uniforms[key];
+    Object.keys(shaderParams.uniforms).forEach((key) => {
+      const val = shaderParams.uniforms[key];
 
       try {
         if (helpers.isString(val)) {
           const builder = buildDynamic(val);
-          bound_uniforms[key] = builder;
+          boundUniforms[key] = builder;
         } else if (helpers.isObject(val)) {
           if (val.file) {
-            loadTexture(key, shader_folder + val.file);
+            loadTexture(key, shaderFolder + val.file);
           } else if (val.data) {
             this.uniforms[key] = loadTextureArray(val.data, {
               width: val.data[0].length,
               height: val.length
             });
           } else if (val.random) {
-            function generate() {
-              return new Float32Array(generateRandom(val.random.distribution, val.random.size*4));
-            }
+            const generate = () => new Float32Array(
+              generateRandom(val.random.distribution, val.random.size * 4)
+            );
+
             const tex = loadTextureArray(generate());
             this.uniforms[key] = tex;
-            bound_uniforms[key] = () => {
+            boundUniforms[key] = () => {
               gl.bindTexture(gl.TEXTURE_2D, tex);
-              const level = 0;
               const internalFormat = gl.RGBA;
               const format = internalFormat;
               const width = val.random.size;
               const height = 1;
               const type = gl.FLOAT;
-              gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, generate());
+              gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat,
+                width, height, 0, format, type, generate());
               return tex;
-            }
+            };
           } else {
             throw new Error(`invalid uniform ${JSON.stringify(val)}`);
           }
@@ -343,14 +334,14 @@ function GLSLBench({element, url, spec}) {
           this.uniforms[key] = buildFixed(val);
         }
       } catch (err) {
-        return error(err.message);
+        error(err.message);
       }
-    }
+    });
 
     this.update = () => {
-      for (let key in bound_uniforms) {
-        this.uniforms[key] = bound_uniforms[key]();
-      }
+      Object.keys(boundUniforms).forEach((key) => {
+        this.uniforms[key] = boundUniforms[key]();
+      });
     };
   }
 
@@ -359,13 +350,13 @@ function GLSLBench({element, url, spec}) {
     const errorLineNo = match && match[1];
     if (errorLineNo) {
       const lines = code.split('\n');
-      const i = parseInt(errorLineNo)-1;
-      const context = [i-1, i, i+1].map(j => ({ lineNo: j+1, line: lines[j]}))
+      const i = parseInt(errorLineNo, 10) - 1;
+      const context = [i - 1, i, i + 1].map(j => ({ lineNo: j + 1, line: lines[j] }))
         .filter(x => x.line !== undefined)
         .map(x => `${x.lineNo}: ${x.line}`)
         .join('\n');
 
-      return msg + '\n' + context;
+      return `${msg}\n${context}`;
     }
 
     return `Shader error: ${msg}`;
@@ -376,11 +367,13 @@ function GLSLBench({element, url, spec}) {
     const programInfo = twgl.createProgramInfo(gl, [
       VERTEX_SHADER_SOURCE,
       this.fragmentShaderSource
-    ], { errorCallback: (sourceAndError) => {
-      const src = this.fragmentShaderSource;
-      const errorMsg = sourceAndError.split("\n").slice(src.split("\n").length).join("\n");
-      error(parseShaderErrorWithContext(errorMsg, src));
-    }});
+    ], {
+      errorCallback: (sourceAndError) => {
+        const src = this.fragmentShaderSource;
+        const errorMsg = sourceAndError.split('\n').slice(src.split('\n').length).join('\n');
+        error(parseShaderErrorWithContext(errorMsg, src));
+      }
+    });
 
     const copyProgramInfo = twgl.createProgramInfo(gl, [
       VERTEX_SHADER_SOURCE,
@@ -390,18 +383,18 @@ function GLSLBench({element, url, spec}) {
     if (!programInfo || !copyProgramInfo) return;
 
     const arrays = {
-      position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0],
+      position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0]
     };
     const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
 
     function checkResize() {
       const width = gl.canvas.clientWidth;
       const height = gl.canvas.clientHeight;
-      if (gl.canvas.width != width ||
-          gl.canvas.height != height) {
-         gl.canvas.width = width;
-         gl.canvas.height = height;
-         onResize();
+      if (gl.canvas.width !== width
+          || gl.canvas.height !== height) {
+        gl.canvas.width = width;
+        gl.canvas.height = height;
+        onResize();
       }
     }
 
@@ -429,7 +422,6 @@ function GLSLBench({element, url, spec}) {
         if (!shader.params.monte_carlo && !shader.params.float_buffers) {
           // render directly to screen
           twgl.drawBufferInfo(gl, bufferInfo);
-
         } else {
           const currentTarget = frameBuffers[frameNumber % 2];
 
@@ -439,7 +431,7 @@ function GLSLBench({element, url, spec}) {
             const rowsBegin = Math.floor(division / nDivisions * resolution.y);
             const rowsEnd = Math.floor((division + 1) / nDivisions * resolution.y);
             gl.enable(gl.SCISSOR_TEST);
-            gl.scissor(0, rowsBegin, resolution.x, rowsEnd-rowsBegin);
+            gl.scissor(0, rowsBegin, resolution.x, rowsEnd - rowsBegin);
             twgl.drawBufferInfo(gl, bufferInfo);
             gl.disable(gl.SCISSOR_TEST);
           } else {
@@ -448,7 +440,7 @@ function GLSLBench({element, url, spec}) {
 
           // renderer.render( scene, camera, currentTarget );
 
-          const refreshEvery = parseInt(shader.params.refresh_every || 1);
+          const refreshEvery = parseInt(shader.params.refresh_every || 1, 10);
           if (lastDivision && frameNumber % refreshEvery === 0) {
             gl.useProgram(copyProgramInfo.program);
             twgl.bindFramebufferInfo(gl, null);
@@ -462,11 +454,10 @@ function GLSLBench({element, url, spec}) {
           }
         }
         if (lastDivision) frameNumber++;
-
       } catch (err) {
         error(err.message);
       }
-    }
+    };
 
     if (shader.params.resolution) {
       canvas.width = shader.params.resolution[0];
@@ -477,21 +468,20 @@ function GLSLBench({element, url, spec}) {
 
     // TODO: canvas
     document.onmousemove = (e) => {
-      const offset = helpers.offset(container);
-      mouse_pos.x = e.pageX - container.offsetLeft;
-      mouse_pos.y = e.pageY - container.offsetTop;
-      mouse_pos.rel_x = mouse_pos.x / container.offsetWidth;
-      mouse_pos.rel_y = mouse_pos.y / container.offsetHeight;
+      mousePos.x = e.pageX - container.offsetLeft;
+      mousePos.y = e.pageY - container.offsetTop;
+      mousePos.rel_x = mousePos.x / container.offsetWidth;
+      mousePos.rel_y = mousePos.y / container.offsetHeight;
     };
 
     animate();
-  }
+  };
 
   function onResize() {
     const width = gl.drawingBufferWidth;
     const height = gl.drawingBufferHeight;
 
-    //console.log(`resize ${width}x${height}`);
+    // console.log(`resize ${width}x${height}`);
 
     // https://webglfundamentals.org/webgl/lessons/webgl-anti-patterns.html
     gl.viewport(0, 0, width, height);
@@ -507,8 +497,7 @@ function GLSLBench({element, url, spec}) {
       }];
 
       if (frameBuffers) {
-        frameBuffers.forEach(fb =>
-          twgl.resizeFramebufferInfo(gl, fb, attachments, width, height));
+        frameBuffers.forEach(fb => twgl.resizeFramebufferInfo(gl, fb, attachments, width, height));
       } else {
         gl.getExtension('OES_texture_float');
         // TODO: are these always zero or do they have to be initialized?
@@ -526,7 +515,6 @@ function GLSLBench({element, url, spec}) {
   // is a frightenigly easy way to bring entire desktop or phone UI running
   // this into a griding halt
   function RenderingAutoPartitioner() {
-    const targetBlockTimeMs = 30 + 10;
     const maxDivisions = 20;
     const maxFrameGap = 30;
     const adjustmentBatchSize = 4;
@@ -535,8 +523,9 @@ function GLSLBench({element, url, spec}) {
     let nDivisions = 5;
     let wasDecreased = false;
 
+    /* eslint-disable no-console */
     function increaseWork() {
-      //if (nDivisions < 5) { changesLeft = 0; return; }
+      // if (nDivisions < 5) { changesLeft = 0; return; }
       if (nDivisions > 1) {
         if (wasDecreased) nDivisions--;
         else nDivisions = Math.round(nDivisions / 3);
@@ -552,12 +541,12 @@ function GLSLBench({element, url, spec}) {
       if (nDivisions === 1 && frameGapMs < maxFrameGap) {
         frameGapMs = Math.max(1, Math.min(frameGapMs * 2, maxFrameGap));
         console.log(`increased frame gap to ${frameGapMs}ms`);
-      }
-      else if (nDivisions < maxDivisions) {
+      } else if (nDivisions < maxDivisions) {
         nDivisions += 2;
         console.log(`increased the number of divisions to ${nDivisions}`);
       }
     }
+    /* eslint-enable no-console */
 
     let t0;
     let batchNumber = 0;
@@ -569,18 +558,18 @@ function GLSLBench({element, url, spec}) {
       if (t0) {
         const dt = t1 - t0;
         frameTimes.push(dt);
-        if (dt > 100) console.log(`${dt} !!!`);
+        // if (dt > 100) console.log(`${dt} !!!`);
       }
-      t0 =  t1;
-    }
+      t0 = t1;
+    };
 
     this.adjustProperties = () => {
       batchNumber++;
       if (frameTimes.length > 0 && changesLeft > 0) {
-        const maxTime = frameTimes.reduce((a,b) => Math.max(a,b));
+        const maxTime = frameTimes.reduce((a, b) => Math.max(a, b));
         const target = frameGapMs * 1.5 + 15;
         if (maxTime > target || batchNumber % adjustmentBatchSize === 0) {
-          console.log(`metric ${maxTime}ms target ${target}`);
+          // console.log(`metric ${maxTime}ms target ${target}`);
 
           if (changesLeft > 0) {
             if (maxTime < target) increaseWork();
@@ -595,12 +584,11 @@ function GLSLBench({element, url, spec}) {
         }
       }
       return { nDivisions, frameGapMs };
-    }
+    };
   }
 
   function animate() {
     if (shader.params.monte_carlo) {
-
       let running = true;
       let renderBatchSize;
       let autoPartitioner = new RenderingAutoPartitioner();
@@ -614,7 +602,7 @@ function GLSLBench({element, url, spec}) {
       }
 
       let curDivision = 0;
-      function renderFrame() {
+      const renderFrame = () => {
         if (!running) return;
 
         if (autoPartitioner) {
@@ -639,7 +627,7 @@ function GLSLBench({element, url, spec}) {
           // UI if the GPU cannot keep up
           setTimeout(renderFrame, frameGapMs);
         }
-      }
+      };
 
       setTimeout(renderFrame, 0);
 
@@ -648,20 +636,20 @@ function GLSLBench({element, url, spec}) {
       };
     } else {
       // capped frame rate
-      const timer = requestAnimationFrame( animate );
+      const timer = requestAnimationFrame(animate);
       shader.stop = () => cancelAnimationFrame(timer);
       render();
     }
   }
 
-  function startShader({url, spec}) {
+  function startShader({ shaderUrl, shaderSpec }) {
     function getFolderName(str) {
-        const parts = str.split('/');
-        if (parts.length == 1) return '';
-        parts.pop();
-        let folder = parts.join('/');
-        if (parts.pop() !== '') folder += '/'; // add trailing /
-        return folder;
+      const parts = str.split('/');
+      if (parts.length === 1) return '';
+      parts.pop();
+      let folder = parts.join('/');
+      if (parts.pop() !== '') folder += '/'; // add trailing /
+      return folder;
     }
 
     let shaderFolder = '/';
@@ -673,14 +661,15 @@ function GLSLBench({element, url, spec}) {
       shader = new Shader(shaderParams, shaderFolder);
     }
 
-    if (url) {
-      if (spec) return error("can't have both url and spec");
-      shaderFolder = getFolderName(url);
-      helpers.getJSON(url, doStart);
+    if (shaderUrl) {
+      if (shaderSpec) return error("can't have both url and spec");
+      shaderFolder = getFolderName(shaderUrl);
+      helpers.getJSON(shaderUrl, doStart);
     } else {
-      doStart(spec);
+      doStart(shaderSpec);
     }
+    return null;
   }
 
-  startShader({url, spec});
+  startShader({ shaderUrl: url, shaderSpec: spec });
 }
