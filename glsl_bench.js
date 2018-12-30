@@ -44,13 +44,26 @@ function GLSLBench({ element, url, spec }) {
     return error('Unable to initialize WebGL. Your browser or machine may not support it.');
   }
 
-  this.stop = () => {
-    if (shader && shader.stop) shader.stop();
-  };
+  // changed when the shader starts
+  this.running = false;
+  this.stop = () => {};
 
   this.destroy = () => {
     this.stop();
     if (canvas) canvas.parentNode.removeChild(canvas);
+  };
+
+  this.captureImage = (callback) => {
+    if (!this.running && this.resume) {
+      // if stopped, must render a new frame before capture
+      this.captureCallback = (data) => {
+        callback(data);
+        this.stop();
+      };
+      this.resume();
+    } else {
+      this.captureCallback = callback;
+    }
   };
 
   container.appendChild(canvas);
@@ -451,6 +464,10 @@ function GLSLBench({ element, url, spec }) {
             });
 
             twgl.drawBufferInfo(gl, bufferInfo);
+            if (this.captureCallback) {
+              this.captureCallback(canvas.toDataURL('image/png', 1));
+              this.captureCallback = null;
+            }
           }
         }
         if (lastDivision) frameNumber++;
@@ -587,9 +604,9 @@ function GLSLBench({ element, url, spec }) {
     };
   }
 
-  function animate() {
+  const animate = () => {
+    this.running = true;
     if (shader.params.monte_carlo) {
-      let running = true;
       let renderBatchSize;
       let autoPartitioner = new RenderingAutoPartitioner();
       let { frameGapMs, nDivisions } = autoPartitioner.adjustProperties();
@@ -603,7 +620,7 @@ function GLSLBench({ element, url, spec }) {
 
       let curDivision = 0;
       const renderFrame = () => {
-        if (!running) return;
+        if (!this.running) return;
 
         if (autoPartitioner) {
           autoPartitioner.recordFrame();
@@ -619,7 +636,7 @@ function GLSLBench({ element, url, spec }) {
 
         if (frameGapMs > 1) {
           setTimeout(() => {
-            if (running) requestAnimationFrame(renderFrame);
+            if (this.running) requestAnimationFrame(renderFrame);
           }, frameGapMs);
         } else {
           // with small frame gap, render at maximum speed by dropping
@@ -631,16 +648,21 @@ function GLSLBench({ element, url, spec }) {
 
       setTimeout(renderFrame, 0);
 
-      shader.stop = () => {
-        running = false;
+      this.stop = () => {
+        this.running = false;
       };
     } else {
       // capped frame rate
       const timer = requestAnimationFrame(animate);
-      shader.stop = () => cancelAnimationFrame(timer);
+      this.stop = () => {
+        cancelAnimationFrame(timer);
+        this.running = false;
+      };
       render();
     }
-  }
+  };
+
+  this.resume = () => { animate(); };
 
   function startShader({ shaderUrl, shaderSpec }) {
     function getFolderName(str) {
