@@ -453,8 +453,7 @@ function GLSLBench({ element, url, spec }) {
 
           // renderer.render( scene, camera, currentTarget );
 
-          const refreshEvery = parseInt(shader.params.refresh_every || 1, 10);
-          if (lastDivision && frameNumber % refreshEvery === 0) {
+          if (lastDivision && frameNumber % this.refreshEvery === 0) {
             gl.useProgram(copyProgramInfo.program);
             twgl.bindFramebufferInfo(gl, null);
             twgl.setBuffersAndAttributes(gl, copyProgramInfo, bufferInfo);
@@ -527,122 +526,56 @@ function GLSLBench({ element, url, spec }) {
     frameNumber = 0;
   }
 
-  // Tries to learn suitable rendering workload parameters for the GPU and
-  // scene to keep the page responsive. As of 2018, cranking the load too high
-  // is a frightenigly easy way to bring entire desktop or phone UI running
-  // this into a griding halt
-  function RenderingAutoPartitioner() {
-    const maxDivisions = 20;
-    const maxFrameGap = 30;
-    const adjustmentBatchSize = 4;
-    let frameGapMs = maxFrameGap;
-    let changesLeft = 30; // maximum number of adjustments
-    let nDivisions = 5;
-    let wasDecreased = false;
-
-    /* eslint-disable no-console */
-    function increaseWork() {
-      // if (nDivisions < 5) { changesLeft = 0; return; }
-      if (nDivisions > 1) {
-        if (wasDecreased) nDivisions--;
-        else nDivisions = Math.round(nDivisions / 3);
-        console.log(`reduced number of divisions to ${nDivisions}`);
-      } else if (frameGapMs > 0) {
-        frameGapMs = Math.floor(frameGapMs / 2);
-        console.log(`reduced frame gap to ${frameGapMs}ms`);
-      }
+  this.setLoadProfile = (load) => {
+    if (load < 0) {
+      this.nDivisions = -load;
+      this.refreshEvery = 1;
+      this.frameGap = 30;
+    } else if (load < 1) {
+      this.refreshEvery = 5;
+      this.nDivisions = 1;
+      this.frameGap = Math.ceil((1.0 - load) * 29) + 1;
+    } else {
+      this.nDivisions = 1;
+      this.refreshEvery = 10;
+      this.batchSize = Math.round(load);
+      this.frameGap = 0;
     }
+  };
 
-    function decreaseWork() {
-      wasDecreased = true;
-      if (nDivisions === 1 && frameGapMs < maxFrameGap) {
-        frameGapMs = Math.max(1, Math.min(frameGapMs * 2, maxFrameGap));
-        console.log(`increased frame gap to ${frameGapMs}ms`);
-      } else if (nDivisions < maxDivisions) {
-        nDivisions += 2;
-        console.log(`increased the number of divisions to ${nDivisions}`);
-      }
-    }
-    /* eslint-enable no-console */
-
-    let t0;
-    let batchNumber = 0;
-    let frameTimes = [];
-
-    this.recordFrame = () => {
-      if (!changesLeft) return;
-      const t1 = Date.now();
-      if (t0) {
-        const dt = t1 - t0;
-        frameTimes.push(dt);
-        // if (dt > 100) console.log(`${dt} !!!`);
-      }
-      t0 = t1;
-    };
-
-    this.adjustProperties = () => {
-      batchNumber++;
-      if (frameTimes.length > 0 && changesLeft > 0) {
-        const maxTime = frameTimes.reduce((a, b) => Math.max(a, b));
-        const target = frameGapMs * 1.5 + 15;
-        if (maxTime > target || batchNumber % adjustmentBatchSize === 0) {
-          // console.log(`metric ${maxTime}ms target ${target}`);
-
-          if (changesLeft > 0) {
-            if (maxTime < target) increaseWork();
-            else decreaseWork();
-            changesLeft--;
-            if (changesLeft === 0) {
-              // keep on the easy side
-              decreaseWork();
-            }
-          }
-          frameTimes = [];
-        }
-      }
-      return { nDivisions, frameGapMs };
-    };
-  }
+  this.setLoadProfile(1);
 
   const animate = () => {
     this.running = true;
     if (shader.params.monte_carlo) {
-      let renderBatchSize;
-      let autoPartitioner = new RenderingAutoPartitioner();
-      let { frameGapMs, nDivisions } = autoPartitioner.adjustProperties();
-
+      let nDivisions = this.nDivisions;
       if (!shader.params.batch_size) {
-        renderBatchSize = 1;
+        this.batchSize = 1;
       } else {
-        renderBatchSize = shader.params.batch_size;
-        autoPartitioner = null;
+        this.batchSize = shader.params.batch_size;
       }
 
       let curDivision = 0;
       const renderFrame = () => {
         if (!this.running) return;
 
-        if (autoPartitioner) {
-          autoPartitioner.recordFrame();
-          if (curDivision === 0) {
-            ({ nDivisions, frameGapMs } = autoPartitioner.adjustProperties());
-            shader.params.refresh_every = nDivisions === 1 ? 5 : 1;
-          }
+        if (curDivision === 0) {
+          nDivisions = this.nDivisions;
         }
-        for (let i = 0; i < renderBatchSize; ++i) {
+        for (let i = 0; i < this.batchSize; ++i) {
           render(curDivision, nDivisions);
           curDivision = (curDivision + 1) % nDivisions;
         }
 
-        if (frameGapMs > 1) {
+        if (this.frameGap > 1) {
           setTimeout(() => {
             if (this.running) requestAnimationFrame(renderFrame);
-          }, frameGapMs);
+          }, this.frameGap);
         } else {
           // with small frame gap, render at maximum speed by dropping
           // requestAnimationFrame, which has a high risk of freezing the
           // UI if the GPU cannot keep up
-          setTimeout(renderFrame, frameGapMs);
+          setTimeout(renderFrame, this.frameGap);
         }
       };
 
@@ -680,6 +613,7 @@ function GLSLBench({ element, url, spec }) {
       if (!shaderParams) {
         error('missing shader spec!');
       }
+      this.refreshEvery = parseInt(shaderParams.refresh_every || 1, 10);
       shader = new Shader(shaderParams, shaderFolder);
     }
 
