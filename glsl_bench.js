@@ -85,11 +85,13 @@ function GLSLBench({ element, url, spec }) {
     'precision highp int;'
   ].join('\n')}\n`;
 
-  const COPY_FRAGMENT_SHADER = `
+  const GAMMA_CORRECTION_FRAGMENT_SHADER = `
   uniform sampler2D source;
   uniform vec2 resolution;
+  uniform float gamma;
   void main() {
-    gl_FragColor = texture2D(source, gl_FragCoord.xy / resolution.xy);
+    vec4 src = texture2D(source, gl_FragCoord.xy / resolution.xy);
+    gl_FragColor = vec4(pow(src.xyz, vec3(1,1,1) / gamma), src.w);
   }
   `;
 
@@ -390,7 +392,7 @@ function GLSLBench({ element, url, spec }) {
 
     const copyProgramInfo = twgl.createProgramInfo(gl, [
       VERTEX_SHADER_SOURCE,
-      RAW_FRAGMENT_SHADER_PREFIX + COPY_FRAGMENT_SHADER
+      RAW_FRAGMENT_SHADER_PREFIX + GAMMA_CORRECTION_FRAGMENT_SHADER
     ], { errorCallback: error });
 
     if (!programInfo || !copyProgramInfo) return;
@@ -459,7 +461,8 @@ function GLSLBench({ element, url, spec }) {
             twgl.setBuffersAndAttributes(gl, copyProgramInfo, bufferInfo);
             twgl.setUniforms(copyProgramInfo, {
               source: currentTarget.attachments[0],
-              resolution: [resolution.x, resolution.y]
+              resolution: [resolution.x, resolution.y],
+              gamma: shader.params.gamma || 1.0
             });
 
             twgl.drawBufferInfo(gl, bufferInfo);
