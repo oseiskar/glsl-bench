@@ -610,7 +610,7 @@ function GLSLBench({ element, url, spec }) {
       return folder;
     }
 
-    let shaderFolder = '/';
+    let shaderFolder = '';
 
     function doStart(shaderParams) {
       if (!shaderParams) {
