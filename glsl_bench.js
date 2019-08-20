@@ -85,6 +85,13 @@ function GLSLBench({ element, url, spec }) {
     'precision highp int;'
   ].join('\n')}\n`;
 
+  const COPY_FRAGMENT_SHADER = `
+  uniform sampler2D source;
+  uniform vec2 resolution;
+  void main() {
+    gl_FragColor = texture2D(source, gl_FragCoord.xy / resolution.xy);
+  }`;
+
   const GAMMA_CORRECTION_FRAGMENT_SHADER = `
   uniform sampler2D source;
   uniform vec2 resolution;
@@ -92,6 +99,19 @@ function GLSLBench({ element, url, spec }) {
   void main() {
     vec4 src = texture2D(source, gl_FragCoord.xy / resolution.xy);
     gl_FragColor = vec4(pow(src.xyz, vec3(1,1,1) / gamma), src.w);
+  }
+  `;
+
+  const SRGB_FRAGMENT_SHADER = `
+  uniform sampler2D source;
+  uniform vec2 resolution;
+  void main() {
+    // https://gamedev.stackexchange.com/a/148088
+    vec4 src = texture2D(source, gl_FragCoord.xy / resolution.xy);
+    vec3 cutoff = vec3(lessThan(src.xyz, vec3(0.0031308)));
+    vec3 higher = vec3(1.055)*pow(src.xyz, vec3(1.0/2.4)) - vec3(0.055);
+    vec3 lower = src.xyz * vec3(12.92);
+    gl_FragColor = vec4(higher * (vec3(1.0) - cutoff) + lower * cutoff, src.w);
   }
   `;
 
@@ -392,10 +412,23 @@ function GLSLBench({ element, url, spec }) {
 
     const copyProgramInfo = twgl.createProgramInfo(gl, [
       VERTEX_SHADER_SOURCE,
+      RAW_FRAGMENT_SHADER_PREFIX + COPY_FRAGMENT_SHADER
+    ], { errorCallback: error });
+
+    const gammaCorrectionProgramInfo = twgl.createProgramInfo(gl, [
+      VERTEX_SHADER_SOURCE,
       RAW_FRAGMENT_SHADER_PREFIX + GAMMA_CORRECTION_FRAGMENT_SHADER
     ], { errorCallback: error });
 
-    if (!programInfo || !copyProgramInfo) return;
+    const sRgbPostprocessor = twgl.createProgramInfo(gl, [
+      VERTEX_SHADER_SOURCE,
+      RAW_FRAGMENT_SHADER_PREFIX + SRGB_FRAGMENT_SHADER
+    ], { errorCallback: error });
+
+    if (!programInfo
+      || !copyProgramInfo
+      || !gammaCorrectionProgramInfo
+      || !sRgbPostprocessor) return;
 
     const arrays = {
       position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0]
@@ -456,14 +489,25 @@ function GLSLBench({ element, url, spec }) {
           // renderer.render( scene, camera, currentTarget );
 
           if (lastDivision && frameNumber % this.refreshEvery === 0) {
-            gl.useProgram(copyProgramInfo.program);
-            twgl.bindFramebufferInfo(gl, null);
-            twgl.setBuffersAndAttributes(gl, copyProgramInfo, bufferInfo);
-            twgl.setUniforms(copyProgramInfo, {
+            let postprocessor;
+            const gamma = shader.params.gamma || 1.0;
+            const uniforms = {
               source: currentTarget.attachments[0],
-              resolution: [resolution.x, resolution.y],
-              gamma: shader.params.gamma || 1.0
-            });
+              resolution: [resolution.x, resolution.y]
+            };
+            if (parseFloat(gamma) === 1.0) {
+              postprocessor = copyProgramInfo;
+            } else if (gamma.toUpperCase && gamma.toUpperCase() === 'SRGB') {
+              postprocessor = sRgbPostprocessor;
+            } else {
+              postprocessor = gammaCorrectionProgramInfo;
+              uniforms.gamma = parseFloat(gamma);
+            }
+
+            gl.useProgram(postprocessor.program);
+            twgl.bindFramebufferInfo(gl, null);
+            twgl.setBuffersAndAttributes(gl, postprocessor, bufferInfo);
+            twgl.setUniforms(postprocessor, uniforms);
 
             twgl.drawBufferInfo(gl, bufferInfo);
             if (this.captureCallback) {
