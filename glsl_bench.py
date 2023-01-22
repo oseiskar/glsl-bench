@@ -41,7 +41,7 @@ def get_uniform_values_and_mappings(json_uniforms):
     uniforms = {}
     bound_uniforms = {}
     for name, value in json_uniforms.items():
-        if isinstance(value, basestring) or isinstance(value, dict):
+        if isinstance(value, str) or isinstance(value, dict):
             bound_uniforms[name] = value
             uniforms[name] = None
         else:
@@ -147,16 +147,14 @@ def main(args):
 
         if args.png_output_file is not None:
             # normalize and save as 8-bit channels (PNG)
-            result_image = numpy.clip(result_image, 0.0, 1.0)*255
-            result_image = result_image.astype(numpy.uint8)
-
-            import scipy.misc
-            scipy.misc.imsave(args.png_output_file, result_image)
+            import PIL.Image
+            bytedata = (numpy.clip(result_image, 0, 1)*255).astype(numpy.uint8)
+            PIL.Image.fromarray(bytedata).save(args.png_output_file)
 
     glEnable( GL_TEXTURE_2D )
 
     # handle compile time uniforms
-    for name in shader.uniform_mappings.keys()[::]:
+    for name in list(shader.uniform_mappings.keys())[::]:
         source = shader.uniform_mappings[name]
         if isinstance(source, dict):
             def data_texture(**kwargs):
@@ -183,7 +181,7 @@ def main(args):
                 with shader.dir.as_working_dir():
                     shader.uniforms[name] = Texture.load(source['file'])
         elif source == 'resolution':
-            shader.uniforms[name] = map(float, shader.resolution)
+            shader.uniforms[name] = [float(c) for c in shader.resolution]
         else:
             # the rest are run-time mapped values
             continue

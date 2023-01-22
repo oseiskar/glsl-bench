@@ -51,12 +51,12 @@ class Texture:
 
     @staticmethod
     def load(filename):
-        from scipy import misc
-        data = misc.imread(filename)
+        import PIL.Image
+        image = PIL.Image.open(filename)
+        assert(image.mode == 'RGB' or image.mode == 'RGBA')
+        data = numpy.asarray(image)
         if len(data.shape) == 0:
             raise RuntimeError("Failed to load image " + filename)
-            # ... but instead of raising an exception, PIL decided to give us
-            # this bullshit 0-dimensional array :(
 
         # drop alpha
         if data.shape[2] == 4: data = data[..., 0:3]

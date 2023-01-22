@@ -45,7 +45,9 @@ def beach_ball_texture():
     return numpy.dstack((s,s,s))
 
 def save_img(filename, data):
-    scipy.misc.imsave(filename, (numpy.clip(data, 0, 1)*255).astype(numpy.uint8))
+    import PIL.Image
+    bytedata = (numpy.clip(data, 0, 1)*255).astype(numpy.uint8)
+    PIL.Image.fromarray(bytedata).save(filename)
 
 save_img('stars.png', star_texture())
 save_img('accretion-disk.png', accretion_disk_texture())

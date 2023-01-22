@@ -64,7 +64,7 @@ class Shader:
 
     def set_uniforms(self, **kwargs):
 
-        from texture import Texture
+        from .texture import Texture
 
         for name, value in kwargs.items():
             self.uniforms[name] = value

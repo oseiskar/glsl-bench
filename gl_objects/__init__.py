@@ -1,3 +1,3 @@
-from texture import Texture
-from framebuffer import Framebuffer
-from shader import Shader
+from .texture import Texture
+from .framebuffer import Framebuffer
+from .shader import Shader

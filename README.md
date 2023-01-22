@@ -10,7 +10,7 @@ functionality but runs locally.
 
 or
 
-    python -m SimpleHTTPServer
+    python3 -m http.server 8000 --bind 127.0.0.1
     # open: http://localhost:8000/?shader=examples/black-hole/black-hole.json
 
 **Features**
@@ -19,7 +19,7 @@ or
  * Specifying textures in configuration files
  * Image output in raw float (`.npy`) and PNG formats
 
-**Python dependencies**: `pygame`, `scipy`
+**Python dependencies**: Install as `pip install -r requirements.txt`
 
 **JavaScript** version uses [TWGL](https://twgljs.org/), which included
 in `js_libs/` (distributed under the MIT license)

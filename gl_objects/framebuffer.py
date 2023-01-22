@@ -2,7 +2,7 @@ import numpy
 from contextlib import contextmanager
 
 from OpenGL.GL import *
-from texture import Texture
+from .texture import Texture
 
 class Framebuffer:
 
