@@ -94,6 +94,7 @@ def main(args):
     import time
     from gl_boilerplate import texture_rect
     from gl_objects import Texture, Framebuffer
+    from output_shader import OutputShader
 
     t0 = time.time()
 
@@ -111,6 +112,11 @@ def main(args):
 
     monte_carlo = shader.params.get('monte_carlo')
 
+    output_shader = OutputShader(
+        resolution=shader.params['resolution'],
+        gamma=shader.params.get('gamma', None),
+        flip_y=shader.params.get('flip_y', False))
+
     def new_texture():
         extra_args = {}
         # in Monte Carlo mode, use float32 textures
@@ -124,10 +130,10 @@ def main(args):
 
     aspect = shader.aspect_ratio
 
-    glMatrixMode(GL_PROJECTION);
+    glMatrixMode(GL_PROJECTION)
     glOrtho(-aspect, aspect, -1, 1, 1, -1)
 
-    glMatrixMode(GL_MODELVIEW);
+    glMatrixMode(GL_MODELVIEW)
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 
     n_samples = 0
@@ -237,8 +243,8 @@ def main(args):
                 texture_rect(aspect)
 
         if n_samples % refresh_every == 0:
-            # render from texture 0
-            with textures[1].bind():
+            # render from texture 1
+            with output_shader.use_program(textures[1]._gl_handle):
                 texture_rect(aspect)
 
             pygame.display.flip()

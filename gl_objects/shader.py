@@ -75,3 +75,7 @@ class Shader:
                 self._set_texture(name, value)
             else:
                 self._set_uniform(name, value)
+
+    def get_uniform_handle(self, name):
+        # Low-level bypass for OutputShader
+        return self._uniform_handles[name]

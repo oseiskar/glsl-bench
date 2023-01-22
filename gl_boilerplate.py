@@ -79,7 +79,7 @@ def guess_gl_postfix(value):
     count = len(vals)
     proto_value = vals[0]
 
-    if isinstance(proto_value, int):
+    if isinstance(proto_value, int) or vals.dtype == numpy.int64:
         letter = 'i'
     else:
         letter = 'f'
