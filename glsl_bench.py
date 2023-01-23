@@ -1,5 +1,5 @@
 
-import os, time
+import os
 from contextlib import contextmanager
 
 from gl_objects import Shader
@@ -11,7 +11,9 @@ def parse_command_line_arguments():
     arg_parser.add_argument('-np', '--numpy_output_file')
     arg_parser.add_argument('-png', '--png_output_file', default='out.png')
     arg_parser.add_argument('-res', '--preview_resolution')
+    arg_parser.add_argument('--max_samples', type=int, default=0)
     arg_parser.add_argument('-s', '--sleep', type=float, default=0.0)
+    arg_parser.add_argument('--seed', default=None)
 
     arg_parser.add_argument('shader_file')
     return arg_parser.parse_args()
@@ -50,9 +52,13 @@ def get_uniform_values_and_mappings(json_uniforms):
 
 def load_shader(json_path):
 
-    import json
-    json_data = json.loads(read_file(json_path))
-    shader_dir = DirChanger(json_path)
+    if isinstance(json_path, str):
+        import json
+        json_data = json.loads(read_file(json_path))
+        shader_dir = DirChanger(json_path)
+    else:
+        json_data = json_path
+        shader_dir = DirChanger('.')
 
     if 'source' in json_data:
         source = json_data['source']
@@ -106,7 +112,8 @@ def main(args):
 
     pygame.init()
     pygame.display.set_mode(window_resolution, pygame.locals.DOUBLEBUF | pygame.locals.OPENGL)
-    pygame.display.set_caption(args.shader_file)
+    if isinstance(args.shader_file, str):
+        pygame.display.set_caption(args.shader_file)
 
     shader.build()
 
@@ -143,19 +150,24 @@ def main(args):
         refresh_every = args.refresh_every
 
     def save_results():
-
-        # read image data from the framebuffer
-        result_image = framebuffer.read()
-
         if args.numpy_output_file is not None:
+            # read image data from the framebuffer
+            result_image = framebuffer.read()
             # save raw 32-bit float / HDR channels as a numpy array
             numpy.save(args.numpy_output_file, result_image)
 
         if args.png_output_file is not None:
+            with output_shader.use_program(textures[1]._gl_handle):
+                texture_rect(aspect)
+
+            w, h = shader.params['resolution']
+            result_image = glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE)
+            result_image = numpy.reshape(numpy.array(list(result_image)), (h, w, 3))
+            result_image = result_image[::-1,...].astype(numpy.uint8)
+
             # normalize and save as 8-bit channels (PNG)
             import PIL.Image
-            bytedata = (numpy.clip(result_image, 0, 1)*255).astype(numpy.uint8)
-            PIL.Image.fromarray(bytedata).save(args.png_output_file)
+            PIL.Image.fromarray(result_image).save(args.png_output_file)
 
     glEnable( GL_TEXTURE_2D )
 
@@ -202,14 +214,17 @@ def main(args):
         x, y = get_rel_mouse()
         return [x*shader.resolution[0], y*shader.resolution[1]]
 
+    def do_quit():
+        save_results()
+        pygame.quit()
+        quit()
+
     while True:
         n_samples += 1
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                save_results()
-                pygame.quit()
-                quit()
+                do_quit()
 
         with shader.use_program():
             with framebuffer.render_to_texture(textures[1]):
@@ -252,6 +267,9 @@ def main(args):
         # flip buffers
         textures = textures[::-1]
 
+        if args.max_samples > 0 and n_samples >= args.max_samples:
+            do_quit()
+
         if args.sleep > 0.0:
             time.sleep(args.sleep)
 
@@ -261,8 +279,14 @@ if __name__ == '__main__':
 
     from OpenGL.GL import *
     from OpenGL.GLU import *
+
+    os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+
     import pygame
     import pygame.locals
     import numpy
+
+    if args.seed is not None:
+        numpy.random.seed(int(args.seed))
 
     main(args)
